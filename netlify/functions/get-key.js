@@ -6,7 +6,7 @@
  */
 
 import { getStore } from '@netlify/blobs';
-import { generateKey } from './shared/crypto.mjs';
+import { generateKey } from './shared/crypto.js';
 
 function json(data, status = 200) {
   return {
