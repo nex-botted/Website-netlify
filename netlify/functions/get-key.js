@@ -1,44 +1,62 @@
 /**
- * GET /api/get-key?sid=SESSION_ID
- *
- * Called by key.html to retrieve the generated key for display.
- * Also can be polled by the executor to get the key automatically.
- *
- * Returns: { ok, key, expiresAt }
+ * GET /api/get-key?sid=<sessionId>
+ * 
+ * Called after completing all linkvertise steps.
+ * Returns the generated key tied to the session.
  */
 
 import { getStore } from '@netlify/blobs';
+import { generateKey } from './shared/crypto.mjs';
 
 function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
+  return {
+    statusCode: status,
     headers: { 'Content-Type': 'application/json' },
-  });
+    body: JSON.stringify(data)
+  };
 }
 
-export default async (req) => {
-  const url = new URL(req.url);
-  const sid = url.searchParams.get('sid');
-
-  if (!sid || !/^[0-9a-f]{32}$/.test(sid)) {
-    return json({ ok: false, error: 'Invalid session ID' }, 400);
+export async function handler(event, context) {
+  if (event.httpMethod !== 'GET') {
+    return json({ ok: false, error: 'Method not allowed' }, 405);
   }
 
-  const store   = getStore({ name: 'incognito-sessions', consistency: 'strong' });
-  const session = await store.get(`session:${sid}`, { type: 'json' });
+  const params = event.queryStringParameters || {};
+  const sessionId = params.sid;
 
-  if (!session) return json({ ok: false, error: 'Session not found' }, 404);
-  if (Date.now() > session.expiresAt) return json({ ok: false, error: 'Session expired' }, 403);
+  if (!sessionId) {
+    return json({ ok: false, error: 'Missing session ID' }, 400);
+  }
 
-  if (session.step < 4 || !session.key) {
-    return json({ ok: false, error: 'Key not yet generated', step: session.step }, 202);
+  const store = getStore({ name: 'incognito-sessions', consistency: 'strong' });
+
+  const session = await store.get(`session:${sessionId}`, { type: 'json' });
+
+  if (!session) {
+    return json({ ok: false, error: 'Invalid session' }, 404);
+  }
+
+  const now = Date.now();
+
+  if (session.expiresAt < now) {
+    return json({ ok: false, error: 'Session expired' }, 410);
+  }
+
+  // Must complete all steps before getting key
+  if (session.step < 4) {
+    return json({ ok: false, error: 'Key not ready yet' }, 403);
+  }
+
+  // If key doesn't exist yet → generate it
+  if (!session.key) {
+    session.key = generateKey(session.sessionId);
+    await store.setJSON(`session:${sessionId}`, session);
   }
 
   return json({
     ok: true,
-    key: session.key,
-    expiresAt: new Date(session.stepTimestamps.keyGeneratedAt + 24 * 3600_000).toISOString(),
+    key: session.key
   });
-};
+}
 
 export const config = { path: '/api/get-key' };
