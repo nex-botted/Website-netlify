@@ -1,12 +1,5 @@
-/**
- * GET /api/get-key?sid=<sessionId>
- * 
- * Called after completing all linkvertise steps.
- * Returns the generated key tied to the session.
- */
-
-import { getStore } from '@netlify/blobs';
-import { generateKey } from './shared/crypto.js';
+const { getStore } = require('@netlify/blobs');
+const { generateKey } = require('./shared/crypto');
 
 function json(data, status = 200) {
   return {
@@ -16,52 +9,41 @@ function json(data, status = 200) {
   };
 }
 
-export async function handler(event, context) {
+exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
   }
 
-  const params = event.queryStringParameters || {};
-  const sessionId = params.sid;
-
+  const sessionId = event.queryStringParameters?.sid;
   if (!sessionId) {
     return json({ ok: false, error: 'Missing session ID' }, 400);
   }
 
   const store = getStore({
-  name: 'incognito-sessions',
-  consistency: 'strong',
-  siteID: process.env.NETLIFY_SITE_ID,
-  token: process.env.NETLIFY_AUTH_TOKEN
-});
+    name: 'incognito-sessions',
+    consistency: 'strong',
+    siteID: process.env.NETLIFY_SITE_ID,
+    token: process.env.NETLIFY_AUTH_TOKEN
+  });
 
   const session = await store.get(`session:${sessionId}`, { type: 'json' });
-
-  if (!session) {
-    return json({ ok: false, error: 'Invalid session' }, 404);
-  }
+  if (!session) return json({ ok: false, error: 'Invalid session' }, 404);
 
   const now = Date.now();
-
   if (session.expiresAt < now) {
     return json({ ok: false, error: 'Session expired' }, 410);
   }
 
-  // Must complete all steps before getting key
   if (session.step < 4) {
     return json({ ok: false, error: 'Key not ready yet' }, 403);
   }
 
-  // If key doesn't exist yet → generate it
   if (!session.key) {
     session.key = generateKey(session.sessionId);
     await store.setJSON(`session:${sessionId}`, session);
   }
 
-  return json({
-    ok: true,
-    key: session.key
-  });
-}
+  return json({ ok: true, key: session.key });
+};
 
-export const config = { path: '/api/get-key' };
+exports.config = { path: '/api/get-key' };
