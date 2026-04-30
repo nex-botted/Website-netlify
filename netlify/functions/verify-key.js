@@ -11,7 +11,7 @@ import {
   verifyKeySignature,
   hashHwid,
   encryptPayload
-} from './shared/crypto.mjs';
+} from './shared/crypto.js';
 
 function json(data, status = 200) {
   return {
