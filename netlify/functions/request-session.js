@@ -9,7 +9,7 @@
 
 import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
-import { hashHwid } from './shared/crypto.mjs';
+import { hashHwid } from './shared/crypto.js';
 
 const SESSION_TTL_MS  = 30 * 60 * 1000;   // 30 minutes
 const HWID_RATE_LIMIT = 3;                 // max new sessions per HWID per hour
