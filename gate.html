@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incognito — Key System</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#0b0e0c;
+  color:#fff;
+  font-family:'Sora',sans-serif;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  cursor:none;
+}
+
+/* BG GRID */
+.bg-grid{
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.022) 1px,transparent 1px);
+  background-size:64px 64px;
+  pointer-events:none;z-index:0;
+}
+.bg-noise{
+  position:fixed;inset:0;opacity:.018;pointer-events:none;z-index:1;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.glow{
+  position:fixed;width:600px;height:400px;
+  background:radial-gradient(ellipse,rgba(255,255,255,0.04),transparent 70%);
+  top:50%;left:50%;transform:translate(-50%,-55%);
+  pointer-events:none;z-index:0;
+}
+
+/* CURSOR */
+#cur{position:fixed;width:22px;height:22px;pointer-events:none;z-index:9999;transform:translate(-50%,-50%)}
+#cur::before,#cur::after{content:'';position:absolute;background:rgba(255,255,255,0.7);border-radius:1px}
+#cur::before{width:1px;height:100%;left:50%;top:0;transform:translateX(-50%)}
+#cur::after{width:100%;height:1px;top:50%;left:0;transform:translateY(-50%)}
+#cur-ring{
+  position:fixed;width:42px;height:42px;
+  border:1px solid rgba(255,255,255,0.18);
+  border-radius:50%;pointer-events:none;z-index:9998;
+  transform:translate(-50%,-50%);
+  transition:width .2s,height .2s;
+}
+
+/* MAIN CARD */
+.card{
+  position:relative;z-index:2;
+  width:min(500px,calc(100vw - 40px));
+  background:rgba(14,18,16,0.95);
+  border:1px solid rgba(255,255,255,0.09);
+  border-radius:24px;
+  padding:44px 40px 40px;
+  text-align:center;
+  box-shadow:0 40px 80px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.06);
+  animation:cardIn .5s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
+
+/* LOGO */
+.logo{
+  height:48px;width:auto;
+  filter:brightness(0) invert(1);
+  margin-bottom:32px;
+}
+
+/* STEP INDICATOR */
+.steps{
+  display:flex;align-items:center;justify-content:center;
+  gap:0;margin-bottom:36px;
+}
+.step-item{
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+  position:relative;
+}
+.step-circle{
+  width:36px;height:36px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,0.12);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;
+  font-size:13px;font-weight:700;
+  color:rgba(255,255,255,0.3);
+  background:rgba(255,255,255,0.03);
+  transition:all .4s ease;
+  position:relative;z-index:1;
+}
+.step-circle.done{
+  background:rgba(255,255,255,0.9);
+  border-color:transparent;color:#000;
+}
+.step-circle.active{
+  border-color:rgba(255,255,255,0.6);
+  color:rgba(255,255,255,0.9);
+  background:rgba(255,255,255,0.06);
+  box-shadow:0 0 20px rgba(255,255,255,0.12);
+}
+.step-label{
+  font-size:10px;font-family:'JetBrains Mono',monospace;
+  color:rgba(255,255,255,0.25);letter-spacing:.1em;text-transform:uppercase;
+  transition:color .3s;
+}
+.step-label.active{color:rgba(255,255,255,0.55);}
+.step-label.done{color:rgba(255,255,255,0.4);}
+.step-line{
+  width:60px;height:1px;
+  background:rgba(255,255,255,0.08);
+  margin:0 -2px;margin-bottom:23px;
+  position:relative;overflow:hidden;
+}
+.step-line.filled::after{
+  content:'';position:absolute;inset:0;
+  background:rgba(255,255,255,0.35);
+  animation:fillLine .5s ease both;
+}
+@keyframes fillLine{from{transform:scaleX(0);transform-origin:left}to{transform:scaleX(1)}}
+
+/* COUNTDOWN RING */
+.countdown-wrap{
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 28px;width:100px;height:100px;
+  position:relative;
+}
+.countdown-svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.countdown-track{fill:none;stroke:rgba(255,255,255,0.06);stroke-width:2.5}
+.countdown-arc{
+  fill:none;stroke:rgba(255,255,255,0.75);stroke-width:2.5;
+  stroke-linecap:round;
+  stroke-dasharray:283;
+  stroke-dashoffset:0;
+  transition:stroke-dashoffset .08s linear;
+}
+.countdown-num{
+  font-size:38px;font-weight:800;letter-spacing:-.03em;
+  line-height:1;color:#fff;
+  font-family:'Sora',sans-serif;
+}
+
+/* STATUS STATES */
+.state{display:none}
+.state.active{display:block;animation:fadeIn .35s ease both}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* SPINNER */
+.spinner{
+  width:44px;height:44px;border-radius:50%;
+  border:2px solid rgba(255,255,255,0.08);
+  border-top-color:rgba(255,255,255,0.6);
+  animation:spin .8s linear infinite;
+  margin:0 auto 24px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.state-title{
+  font-size:18px;font-weight:700;margin-bottom:8px;letter-spacing:-.02em;
+}
+.state-sub{
+  font-size:13px;color:rgba(255,255,255,0.4);line-height:1.7;
+}
+.countdown-label{
+  font-size:13px;color:rgba(255,255,255,0.4);margin-top:-6px;margin-bottom:0;
+}
+
+/* ERROR STATE */
+.err-icon{font-size:40px;margin-bottom:16px}
+.err-title{font-size:18px;font-weight:700;margin-bottom:8px;color:#fff}
+.err-msg{
+  font-size:12.5px;font-family:'JetBrains Mono',monospace;
+  color:rgba(255,255,255,0.4);line-height:1.7;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+  border-radius:10px;padding:12px 16px;margin-bottom:20px;
+}
+.retry-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 22px;background:#fff;color:#000;
+  font-size:13px;font-weight:700;font-family:'Sora',sans-serif;
+  border:none;border-radius:100px;cursor:pointer;
+  transition:background .2s,transform .2s;text-decoration:none;
+}
+.retry-btn:hover{background:#e8e8e8;transform:translateY(-1px)}
+
+/* FOOTER TAG */
+.card-footer{
+  margin-top:28px;padding-top:20px;
+  border-top:1px solid rgba(255,255,255,0.06);
+  font-size:11px;font-family:'JetBrains Mono',monospace;
+  color:rgba(255,255,255,0.2);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.status-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 10px;border-radius:100px;
+  border:1px solid rgba(255,255,255,0.1);
+  font-size:10px;
+}
+.sdot{width:5px;height:5px;border-radius:50%;background:#fff;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* BYPASS WARNING */
+.bypass-warn{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:14px 18px;margin-bottom:18px;
+  font-size:12px;color:rgba(255,255,255,0.4);
+  font-family:'JetBrains Mono',monospace;line-height:1.6;
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-noise"></div>
+<div class="glow"></div>
+<div id="cur"></div>
+<div id="cur-ring"></div>
+
+<div class="card" id="card">
+
+  <img src="https://i.ibb.co/bgTn718C/1122.png" alt="Incognito" class="logo" id="logo">
+
+  <!-- Step Indicator -->
+  <div class="steps" id="steps-row">
+    <div class="step-item">
+      <div class="step-circle" id="s1">1</div>
+      <div class="step-label" id="sl1">Link 1</div>
+    </div>
+    <div class="step-line" id="line1"></div>
+    <div class="step-item">
+      <div class="step-circle" id="s2">2</div>
+      <div class="step-label" id="sl2">Link 2</div>
+    </div>
+    <div class="step-line" id="line2"></div>
+    <div class="step-item">
+      <div class="step-circle" id="s3">3</div>
+      <div class="step-label" id="sl3">Link 3</div>
+    </div>
+  </div>
+
+  <!-- STATE: Verifying (loading) -->
+  <div class="state" id="state-loading">
+    <div class="spinner"></div>
+    <div class="state-title">Verifying...</div>
+    <div class="state-sub">Checking your progress with our servers.</div>
+  </div>
+
+  <!-- STATE: Countdown + redirect -->
+  <div class="state" id="state-countdown">
+    <div class="countdown-wrap">
+      <svg class="countdown-svg" viewBox="0 0 100 100">
+        <circle class="countdown-track" cx="50" cy="50" r="45"/>
+        <circle class="countdown-arc" cx="50" cy="50" r="45" id="arc"/>
+      </svg>
+      <div class="countdown-num" id="cnum">3</div>
+    </div>
+    <div class="state-title" id="cd-title">Continuing...</div>
+    <div class="state-sub countdown-label" id="cd-sub">Redirecting you to the next step</div>
+  </div>
+
+  <!-- STATE: Error -->
+  <div class="state" id="state-error">
+    <div class="err-icon">⚠</div>
+    <div class="err-title" id="err-title">Something went wrong</div>
+    <div class="err-msg" id="err-msg">Unknown error</div>
+    <a href="/" class="retry-btn" id="retry-btn">← Back to Home</a>
+  </div>
+
+  <div class="card-footer">
+    <span>incognito key system</span>
+    <span class="status-pill"><span class="sdot"></span> UNDETECTED</span>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const LV_LINKS = {
+  1: 'https://link-hub.net/5418777/Hp6R8sD9NW4S',
+  2: 'https://link-target.net/5418777/7LM5gMCFdkGP',
+  3: 'https://direct-link.net/5418777/YgEOqFalsihT',
+};
+const COUNTDOWN_SECS = 3;
+
+// ── CURSOR ────────────────────────────────────────────────────────────────────
+const cur  = document.getElementById('cur');
+const ring = document.getElementById('cur-ring');
+let mx=0, my=0, rx=0, ry=0;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cur.style.left  = mx + 'px';
+  cur.style.top   = my + 'px';
+});
+(function loop(){ rx+=(mx-rx)*.1; ry+=(my-ry)*.1; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(loop); })();
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function showState(name) {
+  ['loading','countdown','error'].forEach(s => {
+    const el = $('state-'+s);
+    el.classList.toggle('active', s === name);
+  });
+}
+
+function setStepUI(step) {
+  // step = 1, 2, or 3 = the step currently being completed
+  const circles = [$('s1'),$('s2'),$('s3')];
+  const labels  = [$('sl1'),$('sl2'),$('sl3')];
+  const lines   = [$('line1'),$('line2')];
+
+  circles.forEach((c, i) => {
+    const idx = i + 1;
+    c.className = 'step-circle';
+    labels[i].className = 'step-label';
+    if (idx < step)  { c.classList.add('done');   labels[i].classList.add('done'); }
+    if (idx === step){ c.classList.add('active'); labels[i].classList.add('active'); }
+  });
+  lines.forEach((l, i) => {
+    l.className = 'step-line';
+    if (i + 1 < step) l.classList.add('filled');
+  });
+}
+
+function showError(title, msg, showHome = true) {
+  showState('error');
+  $('err-title').textContent = title;
+  $('err-msg').textContent   = msg;
+  const btn = $('retry-btn');
+  if (showHome) { btn.href = '/'; btn.textContent = '← Back to Home'; }
+  else          { btn.href = '/gate?step=1&regen=1'; btn.textContent = 'Try Again'; }
+}
+
+// ── COUNTDOWN ─────────────────────────────────────────────────────────────────
+const circumference = 2 * Math.PI * 45; // ≈ 282.74
+function startCountdown(title, subtitle, onDone) {
+  $('cd-title').textContent = title;
+  $('cd-sub').textContent   = subtitle;
+  showState('countdown');
+
+  const arc   = $('arc');
+  const cnum  = $('cnum');
+  const total = COUNTDOWN_SECS * 1000;
+  const start = Date.now();
+
+  arc.style.strokeDasharray  = circumference;
+  arc.style.strokeDashoffset = 0;
+
+  function tick() {
+    const elapsed  = Date.now() - start;
+    const frac     = Math.min(elapsed / total, 1);
+    const remaining = Math.ceil(COUNTDOWN_SECS - frac * COUNTDOWN_SECS);
+    cnum.textContent = remaining;
+    arc.style.strokeDashoffset = circumference * frac;
+
+    if (frac < 1) requestAnimationFrame(tick);
+    else onDone();
+  }
+  requestAnimationFrame(tick);
+}
+
+// ── COOKIE HELPERS ────────────────────────────────────────────────────────────
+function setCookie(name, val, mins) {
+  const d = new Date(Date.now() + mins * 60000);
+  document.cookie = `${name}=${val};expires=${d.toUTCString()};path=/;SameSite=Lax`;
+}
+function getCookie(name) {
+  const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return m ? m.pop() : null;
+}
+
+// ── GATE ACTION API ───────────────────────────────────────────────────────────
+async function gateAction(sessionId, action) {
+  const res = await fetch('/api/gate-action', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ sessionId, action }),
+  });
+  return res.json();
+}
+
+// ── MAIN FLOW ─────────────────────────────────────────────────────────────────
+async function run() {
+  const params = new URLSearchParams(location.search);
+  const step   = params.get('step');
+  const sid    = params.get('sid') || getCookie('incognito_sid');
+
+  // ── No session ID at all → error ──────────────────────────────────────
+  if (!sid && step !== '1') {
+    showError('Session Not Found',
+      'Your session could not be found. Please restart the key generation process from the executor.',
+      true);
+    return;
+  }
+
+  // ── STEP 1 — First gate page loaded from executor ─────────────────────
+  if (step === '1') {
+    if (!sid) {
+      showError('Invalid Link', 'This gate page requires a valid session ID. Please start from the executor.', true);
+      return;
+    }
+
+    setStepUI(1);
+    showState('loading');
+
+    // Persist session ID in cookie (survives Linkvertise redirect)
+    setCookie('incognito_sid', sid, 35);
+
+    // Tell server we started step 1
+    let res;
+    try { res = await gateAction(sid, 'start_1'); }
+    catch { showError('Network Error', 'Could not reach the server. Check your connection.', false); return; }
+
+    if (!res.ok) {
+      showError(
+        res.error?.includes('expired') ? 'Session Expired' : 'Invalid Session',
+        res.error || 'Session is invalid. Please restart from the executor.',
+        true
+      );
+      return;
+    }
+
+    // Countdown → redirect to LV1
+    startCountdown('Opening Link 1', 'Complete all steps on the next page to continue.', () => {
+      location.href = LV_LINKS[1];
+    });
+    return;
+  }
+
+  // ── STEP 2 — Returned from LV1 ────────────────────────────────────────
+  if (step === '2') {
+    setStepUI(2);
+    showState('loading');
+
+    let res;
+    try { res = await gateAction(sid, 'complete_1'); }
+    catch { showError('Network Error', 'Could not reach the server.', false); return; }
+
+    if (!res.ok) {
+      if (res.waitMs) {
+        showError(
+          'Completed Too Fast',
+          `Bypass attempt detected. Please wait ${Math.ceil(res.waitMs / 1000)} more seconds and try again.`,
+          false
+        );
+      } else {
+        showError('Step Validation Failed', res.error || 'Could not validate step completion.', false);
+      }
+      return;
+    }
+
+    startCountdown('Link 1 Complete ✓', 'Opening Link 2 — complete all steps to continue.', () => {
+      location.href = LV_LINKS[2];
+    });
+    return;
+  }
+
+  // ── STEP 3 — Returned from LV2 ────────────────────────────────────────
+  if (step === '3') {
+    setStepUI(3);
+    showState('loading');
+
+    let res;
+    try { res = await gateAction(sid, 'complete_2'); }
+    catch { showError('Network Error', 'Could not reach the server.', false); return; }
+
+    if (!res.ok) {
+      if (res.waitMs) {
+        showError(
+          'Completed Too Fast',
+          `Bypass attempt detected. Wait ${Math.ceil(res.waitMs / 1000)}s and try again.`,
+          false
+        );
+      } else {
+        showError('Step Validation Failed', res.error || 'Could not validate step 2.', false);
+      }
+      return;
+    }
+
+    startCountdown('Link 2 Complete ✓', 'Last step — almost there!', () => {
+      location.href = LV_LINKS[3];
+    });
+    return;
+  }
+
+  // ── STEP DONE — Returned from LV3, generate key ────────────────────────
+  if (step === 'done') {
+    // Highlight all 3 done
+    ['s1','s2','s3'].forEach(id => { $(id).className = 'step-circle done'; });
+    ['sl1','sl2','sl3'].forEach(id => { const l = $(id); l.className='step-label'; l.classList.add('done'); });
+    ['line1','line2'].forEach(id => $(id).classList.add('filled'));
+    showState('loading');
+
+    let res;
+    try { res = await gateAction(sid, 'complete_3'); }
+    catch { showError('Network Error', 'Could not reach the server.', false); return; }
+
+    if (!res.ok) {
+      if (res.waitMs) {
+        showError('Completed Too Fast', `Wait ${Math.ceil(res.waitMs/1000)}s and retry.`, false);
+      } else {
+        showError('Failed to Generate Key', res.error || 'An error occurred.', false);
+      }
+      return;
+    }
+
+    // All done — store key in cookie temporarily and redirect to /key
+    if (res.key) {
+      setCookie('incognito_key', res.key, 2);
+    }
+
+    startCountdown('All Steps Complete ✓', 'Generating your key...', () => {
+      location.href = `/key?sid=${sid}`;
+    });
+    return;
+  }
+
+  // ── Unknown step ──────────────────────────────────────────────────────
+  showError('Invalid Gate URL', 'This URL is not valid. Please restart from the executor.', true);
+}
+
+run();
+</script>
+</body>
+</html>

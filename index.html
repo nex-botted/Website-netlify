@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incognito — Invisible. Unstoppable.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+    .nav-logo img { height: 80px; /* Change this number to make it as big as you want */ 
+    width: auto; /* This keeps the logo from looking squished */ 
+    display: block; /* Helps with alignment */ }  
+    
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:#0b0e0c;color:#fff;font-family:'Sora',sans-serif;font-weight:300;overflow-x:hidden;cursor:none;min-height:100vh}
+
+/* CURSOR */
+#cur-dot{position:fixed;width:8px;height:8px;background:#fff;border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:width .15s,height .15s}
+#cur-cross{position:fixed;pointer-events:none;z-index:9998;transform:translate(-50%,-50%)}
+#cur-cross::before,#cur-cross::after{content:'';position:absolute;background:rgba(255,255,255,0.6);border-radius:1px}
+#cur-cross::before{width:1px;height:24px;left:50%;top:50%;transform:translate(-50%,-50%)}
+#cur-cross::after{width:24px;height:1px;left:50%;top:50%;transform:translate(-50%,-50%)}
+#cur-ring{position:fixed;width:44px;height:44px;border:1px solid rgba(255,255,255,0.2);border-radius:50%;pointer-events:none;z-index:9997;transform:translate(-50%,-50%);transition:width .22s,height .22s,border-color .22s}
+body *{cursor:none!important}
+
+/* NAV */
+#navbar{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:800;width:calc(100% - 48px);max-width:1160px}
+.nav-pill{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:rgba(11,14,12,0.85);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,0.09);border-radius:100px;gap:16px}
+.nav-logo img{height:30px;width:auto;display:block;filter:brightness(0) invert(1)}
+.nav-links{display:flex;align-items:center;gap:2px;list-style:none}
+.nav-links a{padding:7px 16px;color:rgba(255,255,255,0.5);text-decoration:none;font-size:13px;font-weight:400;border-radius:100px;transition:color .2s,background .2s}
+.nav-links a:hover,.nav-links a.active{color:#fff;background:rgba(255,255,255,0.07)}
+.nav-btns{display:flex;gap:8px;align-items:center}
+.btn-ghost{padding:8px 18px;border:1px solid rgba(255,255,255,0.13);background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.65);font-size:13px;font-weight:400;font-family:'Sora',sans-serif;border-radius:100px;text-decoration:none;transition:all .2s;white-space:nowrap}
+.btn-ghost:hover{border-color:rgba(255,255,255,0.32);color:#fff;background:rgba(255,255,255,0.06)}
+.btn-solid{padding:9px 22px;background:#fff;color:#000;font-size:13px;font-weight:600;font-family:'Sora',sans-serif;border:none;border-radius:100px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .2s;white-space:nowrap}
+.btn-solid:hover{background:#e8e8e8;transform:translateY(-1px);box-shadow:0 6px 24px rgba(255,255,255,0.12)}
+
+/* PAGES */
+.page{display:none;opacity:0}
+.page.active{display:block;animation:pageIn .42s cubic-bezier(.22,1,.36,1) both}
+@keyframes pageIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* BG */
+.bg-grid{position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:64px 64px;pointer-events:none;z-index:0}
+.bg-noise{position:fixed;inset:0;opacity:0.018;pointer-events:none;z-index:1;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* UTILS */
+.wrap{max-width:1160px;margin:0 auto;padding:0 32px;position:relative;z-index:2}
+.section-tag{font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:.25em;text-transform:uppercase;display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.section-tag::before{content:'';width:24px;height:1px;background:rgba(255,255,255,0.25)}
+.section-h{font-size:clamp(36px,5vw,60px);font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:12px}
+.hl{background:linear-gradient(90deg,#fff,rgba(255,255,255,0.55));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.section-p{font-size:14px;color:rgba(255,255,255,0.4);line-height:1.8;max-width:420px}
+.h-line{height:1px;background:rgba(255,255,255,0.07)}
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .65s ease,transform .65s ease}
+.reveal.vis{opacity:1;transform:none}
+
+/* ── HOME ── */
+#page-home{padding-top:100px}
+.hero{min-height:calc(100vh - 100px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 32px 80px;position:relative;z-index:2}
+.hero-glow{position:absolute;width:900px;height:600px;background:radial-gradient(ellipse,rgba(255,255,255,0.04) 0%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:5px 14px 5px 10px;border:1px solid rgba(255,255,255,0.12);border-radius:100px;font-size:11px;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.45);letter-spacing:.12em;text-transform:uppercase;margin-bottom:36px;animation:fd .7s .05s both}
+.badge-dot{width:5px;height:5px;background:#fff;border-radius:50%;animation:blink 2.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hero-logo{width:200px;height:auto;filter:brightness(0) invert(1);margin-bottom:40px;animation:fd .7s .12s both}
+.hero-h{font-size:clamp(54px,9vw,120px);font-weight:800;line-height:1;letter-spacing:-.03em;background:linear-gradient(175deg,#fff 0%,rgba(255,255,255,0.45) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:fd .7s .2s both}
+.hero-p{font-size:clamp(14px,1.6vw,17px);color:rgba(255,255,255,0.4);font-weight:300;max-width:460px;line-height:1.8;margin:22px auto 44px;animation:fd .7s .28s both}
+.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;animation:fd .7s .36s both}
+.btn-lg{padding:13px 30px;font-size:14px;font-weight:600}
+@keyframes fd{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* STATS */
+.stats-row{display:flex;justify-content:center;border-top:1px solid rgba(255,255,255,0.07);border-bottom:1px solid rgba(255,255,255,0.07);animation:fd .7s .44s both}
+.stat-cell{flex:1;text-align:center;padding:40px 20px;border-right:1px solid rgba(255,255,255,0.07)}
+.stat-cell:last-child{border-right:none}
+.stat-val{font-size:clamp(38px,5vw,62px);font-weight:800;letter-spacing:-.03em;line-height:1}
+.stat-lbl{font-size:11px;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.35);letter-spacing:.18em;text-transform:uppercase;margin-top:8px}
+
+/* COVERS */
+.covers-section{padding:80px 0}
+.cover-pill-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+.cover-chip{display:flex;align-items:center;gap:8px;padding:10px 18px;border:1px solid rgba(255,255,255,0.1);border-radius:100px;font-size:13px;font-weight:500;color:rgba(255,255,255,0.65);background:rgba(255,255,255,0.03);transition:all .2s}
+.cover-chip:hover{border-color:rgba(255,255,255,0.25);color:#fff;background:rgba(255,255,255,0.07)}
+
+/* PREVIEW PANEL */
+.preview-panel{border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;background:#0d1110}
+.panel-topbar{display:flex;align-items:center;gap:8px;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.02)}
+.panel-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.12)}
+.panel-title{font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,0.25);letter-spacing:.08em;margin-left:4px}
+.panel-body{display:grid;grid-template-columns:210px 1fr;min-height:250px}
+.panel-sidebar{border-right:1px solid rgba(255,255,255,0.06);padding:14px;display:flex;flex-direction:column;gap:3px}
+.ps-item{padding:7px 11px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,0.32);transition:background .2s;display:flex;justify-content:space-between;align-items:center}
+.ps-item:hover,.ps-item.on{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7)}
+.ps-tag{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,0.14);color:rgba(255,255,255,0.6)}
+.panel-main{padding:18px}
+.pm-row{display:flex;gap:10px;margin-bottom:12px;align-items:center}
+.pm-input{flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:7px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,0.45);outline:none}
+.pm-btn{padding:7px 13px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,0.55);white-space:nowrap}
+.pm-exec{padding:7px 16px;background:#fff;color:#000;border:none;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.04em}
+.code-area{background:rgba(0,0,0,0.3);border-radius:10px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.9;color:rgba(255,255,255,0.45)}
+.ck{color:#fff;font-weight:500}.cs{color:rgba(255,255,255,0.7)}.cc{color:rgba(255,255,255,0.22)}
+
+/* HOME CTA */
+.home-cta{border-top:1px solid rgba(255,255,255,0.07);padding:100px 32px;text-align:center;position:relative;z-index:2}
+.cta-title{font-size:clamp(44px,7vw,88px);font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:16px}
+.cta-sub{font-size:15px;color:rgba(255,255,255,0.4);margin-bottom:40px;line-height:1.7}
+.cta-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+/* FOOTER */
+.footer-wrap{border-top:1px solid rgba(255,255,255,0.07);position:relative;z-index:2}
+footer{max-width:1160px;margin:0 auto;padding:36px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px}
+.ft-logo{height:24px;filter:brightness(0) invert(1);opacity:.4}
+.ft-copy{font-size:11px;color:rgba(255,255,255,0.2);font-family:'JetBrains Mono',monospace}
+.ft-links{display:flex;gap:24px;list-style:none}
+.ft-links a{font-size:12px;color:rgba(255,255,255,0.3);text-decoration:none;transition:color .2s}
+.ft-links a:hover{color:rgba(255,255,255,0.7)}
+
+/* ── FEATURES ── */
+#page-features{padding-top:100px}
+.page-hero{padding:70px 32px 50px;text-align:center;position:relative;z-index:2}
+.page-h{font-size:clamp(48px,7vw,96px);font-weight:800;letter-spacing:-.03em;line-height:1;background:linear-gradient(175deg,#fff 0%,rgba(255,255,255,0.45) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px}
+.page-p{font-size:15px;color:rgba(255,255,255,0.4);max-width:480px;margin:0 auto;line-height:1.8}
+
+/* 3D TILT CARDS */
+.cards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:0 32px 80px;max-width:1160px;margin:0 auto;position:relative;z-index:2}
+.tcard{position:relative;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:30px 26px;background:#0e1210;transform-style:preserve-3d;transition:box-shadow .2s,border-color .2s;overflow:hidden;will-change:transform}
+.tcard::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,0.065),transparent 65%);opacity:0;transition:opacity .25s;border-radius:18px;pointer-events:none}
+.tcard:hover{border-color:rgba(255,255,255,0.18);box-shadow:0 24px 60px rgba(0,0,0,0.55),0 0 40px rgba(255,255,255,0.025)}
+.tcard:hover::before{opacity:1}
+.tc-icon{width:42px;height:42px;border:1px solid rgba(255,255,255,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:20px;background:rgba(255,255,255,0.03)}
+.tc-name{font-size:16px;font-weight:700;color:#fff;margin-bottom:10px;letter-spacing:-.01em}
+.tc-desc{font-size:13px;color:rgba(255,255,255,0.4);line-height:1.75}
+.tc-tag{display:inline-block;margin-top:16px;padding:4px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:100px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.4);letter-spacing:.1em;text-transform:uppercase}
+.tc-tag.hot{border-color:rgba(255,255,255,0.25);color:rgba(255,255,255,0.75);background:rgba(255,255,255,0.05)}
+
+/* INJ SECTION */
+.inj-section{border-top:1px solid rgba(255,255,255,0.07);padding:80px 32px;position:relative;z-index:2}
+.inj-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;max-width:1160px;margin:0 auto}
+.inj-steps{display:flex;flex-direction:column;gap:0;margin-top:36px}
+.inj-step{display:flex;gap:20px;align-items:flex-start;padding:20px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
+.inj-step:last-child{border-bottom:none}
+.inj-num{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:rgba(255,255,255,0.4);flex-shrink:0;margin-top:2px}
+.inj-title{font-size:15px;font-weight:600;margin-bottom:6px}
+.inj-desc{font-size:13px;color:rgba(255,255,255,0.4);line-height:1.7}
+.inj-visual{border:1px solid rgba(255,255,255,0.08);border-radius:16px;background:#0d1110;overflow:hidden}
+.inj-v-top{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.06);font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:space-between}
+.inj-status{display:flex;align-items:center;gap:6px;font-size:10px;color:rgba(255,255,255,0.5)}
+.inj-sdot{width:6px;height:6px;border-radius:50%;background:#fff;animation:blink 2s infinite}
+.inj-body{padding:20px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:2;color:rgba(255,255,255,0.4)}
+.inj-body .ok{color:#fff;font-weight:500}.inj-body .dim{color:rgba(255,255,255,0.2)}
+
+/* ── PRICING ── */
+#page-pricing{padding-top:100px}
+.pricing-wrap{max-width:860px;margin:0 auto;padding:0 32px 100px;position:relative;z-index:2}
+.pricing-cards{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:54px}
+.pcard{border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:40px 32px;background:#0e1210;position:relative;transition:transform .25s,border-color .25s,box-shadow .25s}
+.pcard:hover{transform:translateY(-4px);box-shadow:0 24px 60px rgba(0,0,0,0.5)}
+.pcard.featured{border-color:rgba(255,255,255,0.22);background:#111512}
+.pcard.featured::before{content:'BEST VALUE';position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#fff;color:#000;font-size:9px;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.18em;padding:4px 14px;border-radius:100px}
+.pc-plan{font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,0.35);letter-spacing:.2em;text-transform:uppercase;margin-bottom:18px}
+.pc-price{font-size:68px;font-weight:800;letter-spacing:-.04em;line-height:1;margin-bottom:4px}
+.pc-period{font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:32px}
+.pc-list{list-style:none;margin-bottom:34px}
+.pc-list li{font-size:13px;color:rgba(255,255,255,0.65);padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;gap:10px}
+.pc-list li::before{content:'—';color:rgba(255,255,255,0.2);font-size:11px}
+.pc-list li.yes::before{content:'✓';color:#fff;font-weight:700}
+.pc-list li.no{color:rgba(255,255,255,0.2)}.pc-list li.no::before{content:'✕';color:rgba(255,255,255,0.12)}
+
+/* ── ABOUT ── */
+#page-about{padding-top:100px}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start;padding:80px 32px 60px;max-width:1160px;margin:0 auto;position:relative;z-index:2}
+.about-block{border:1px solid rgba(255,255,255,0.07);border-radius:16px;background:#0e1210;padding:32px;margin-bottom:16px;transition:border-color .2s}
+.about-block:hover{border-color:rgba(255,255,255,0.14)}
+.ab-title{font-size:15px;font-weight:700;margin-bottom:10px}
+.ab-body{font-size:13px;color:rgba(255,255,255,0.45);line-height:1.8}
+.ab-num{font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:700;letter-spacing:-.04em;margin-bottom:6px}
+
+/* ── COMMUNITY ── */
+#page-community{padding-top:100px}
+.community-wrap{max-width:860px;margin:0 auto;padding:80px 32px 100px;position:relative;z-index:2}
+.discord-card{border:1px solid rgba(255,255,255,0.1);border-radius:20px;background:#0e1210;padding:52px;text-align:center;position:relative;overflow:hidden}
+.discord-card::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:500px;height:280px;background:radial-gradient(ellipse,rgba(255,255,255,0.04),transparent 70%);pointer-events:none}
+.dc-icon{font-size:52px;margin-bottom:22px}
+.dc-title{font-size:34px;font-weight:800;letter-spacing:-.03em;margin-bottom:12px}
+.dc-sub{font-size:15px;color:rgba(255,255,255,0.4);max-width:400px;margin:0 auto 36px;line-height:1.7}
+.sup-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
+.sup-card{border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:24px;text-align:center;background:#0d1110;transition:border-color .2s}
+.sup-card:hover{border-color:rgba(255,255,255,0.15)}
+.sup-icon{font-size:26px;margin-bottom:11px}
+.sup-title{font-size:14px;font-weight:600;margin-bottom:6px}
+.sup-desc{font-size:12px;color:rgba(255,255,255,0.4);line-height:1.6}
+</style>
+</head> 
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-noise"></div>
+<div id="cur-dot"></div>
+<div id="cur-cross"></div>
+<div id="cur-ring"></div>
+
+<!-- NAV -->
+<div id="navbar">
+  <div class="nav-pill">
+    <a href="#" class="nav-logo" data-nav="home">
+      <img src="https://i.ibb.co/Ps6YjC6r/1056-removebg-preview.png" alt="Incognito">
+    </a>
+    <ul class="nav-links">
+      <li><a href="#" data-nav="home" class="active">Home</a></li>
+      <li><a href="#" data-nav="about">About</a></li>
+      <li><a href="#" data-nav="features">Features</a></li>
+      <li><a href="#" data-nav="community">Community</a></li>
+    </ul>
+    <div class="nav-btns">
+      <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-ghost">Join our Discord</a>
+      <a href="#" data-nav="pricing" class="btn-solid">Get Started →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ════ HOME ════ -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-badge"><span class="badge-dot"></span> Unreleased BETA · Undetected · 100% UNC</div>
+    <img src="https://i.ibb.co/Ps6YjC6r/1056-removebg-preview.png" alt="Incognito" class="hero-logo">
+    <h1 class="hero-h">Stay Invisible.<br>Stay Ahead.</h1>
+    <p class="hero-p">Secure your game sessions in seconds. Inject, execute, and dominate — without leaving a trace.</p>
+    <div class="hero-btns">
+      <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-ghost btn-lg">Join our Discord</a>
+      <a href="#" data-nav="pricing" class="btn-solid btn-lg">Get Started →</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="stats-row">
+      <div class="stat-cell"><div class="stat-val">100%</div><div class="stat-lbl">UNC Rate</div></div>
+      <div class="stat-cell"><div class="stat-val">&lt;50ms</div><div class="stat-lbl">Inject Time</div></div>
+      <div class="stat-cell"><div class="stat-val">0</div><div class="stat-lbl">Detections</div></div>
+      <div class="stat-cell"><div class="stat-val">∞</div><div class="stat-lbl">Instances</div></div>
+    </div>
+
+    <div class="covers-section">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center">
+        <div class="reveal">
+          <div class="section-tag">What we cover</div>
+          <h2 class="section-h">We cover <span class="hl">all bases</span></h2>
+          <p class="section-p">With Incognito, you can execute your scripts in seconds by dragging them into our suite. Cutting-edge execution, simple and accessible for everyone.</p>
+          <div class="cover-pill-row">
+            <div class="cover-chip">⚡ Fast Execution</div>
+            <div class="cover-chip">👁 Stealth Inject</div>
+            <div class="cover-chip">🔁 Multi Instance</div>
+            <div class="cover-chip">📡 Remote Spy</div>
+            <div class="cover-chip">💾 Auto Save</div>
+            <div class="cover-chip">🔗 Multi Client</div>
+          </div>
+        </div>
+        <div class="reveal">
+          <div class="preview-panel">
+            <div class="panel-topbar">
+              <div class="panel-dot"></div><div class="panel-dot"></div><div class="panel-dot"></div>
+              <span class="panel-title">Incognito — Dashboard</span>
+            </div>
+            <div class="panel-body">
+              <div class="panel-sidebar">
+                <div class="ps-item" style="color:rgba(255,255,255,0.18);font-size:9px;letter-spacing:.14em;padding:4px 10px;margin-bottom:2px">FUNCTIONS</div>
+                <div class="ps-item">inflate_table <span class="ps-tag">USR</span></div>
+                <div class="ps-item on">crc32_z <span class="ps-tag">USR</span></div>
+                <div class="ps-item">adler32 <span class="ps-tag">USR</span></div>
+                <div class="ps-item">inflate_fast <span class="ps-tag">USR</span></div>
+                <div class="ps-item">Curl_conn <span class="ps-tag">SYS</span></div>
+                <div class="ps-item">GetPlayerData <span class="ps-tag">USR</span></div>
+              </div>
+              <div class="panel-main">
+                <div class="pm-row">
+                  <input type="text" class="pm-input" value="Filter Name" readonly>
+                  <input type="text" class="pm-input" value="Filter Type" readonly>
+                  <div class="pm-btn">Clear</div>
+                  <div class="pm-exec">EXECUTE</div>
+                </div>
+                <div class="code-area">
+                  <span class="cc">-- loadstring injected</span><br>
+                  <span class="ck">local</span> plr = <span class="cs">game</span>.<span class="ck">Players</span>.LocalPlayer<br>
+                  <span class="ck">local</span> rs = <span class="cs">game</span>:GetService(<span style="color:rgba(255,255,255,0.6)">"RunService"</span>)<br>
+                  <span class="cc">-- attach payload</span><br>
+                  <span class="ck">getgenv</span>().injected = <span style="color:rgba(255,255,255,0.7)">true</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-cta reveal">
+    <h2 class="cta-title">Stay Ahead<br>And Updatde</h2>
+    <p class="cta-sub">Join hundreds of users who execute without limits — and without being seen.</p>
+    <div class="cta-btns">
+      <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-ghost btn-lg">Join our Discord</a>
+      <a href="#" data-nav="pricing" class="btn-solid btn-lg">Start for free w/key system →</a>
+    </div>
+  </div>
+
+  <div class="footer-wrap"><footer>
+    <img src="https://i.ibb.co/Ps6YjC6r/1056-removebg-preview.png" alt="" class="ft-logo">
+    <ul class="ft-links">
+      <li><a href="#" data-nav="about">About</a></li>
+      <li><a href="#" data-nav="features">Features</a></li>
+      <li><a href="#" data-nav="pricing">Pricing</a></li>
+      <li><a href="https://discord.gg/csvH4jfRcA" target="_blank">Discord</a></li>
+    </ul>
+    <div class="ft-copy">© 2026 Incognito · Not affiliated with Roblox Corp</div>
+  </footer></div>
+</div>
+
+<!-- ════ FEATURES ════ -->
+<div id="page-features" class="page">
+  <div class="page-hero">
+    <div class="section-tag" style="justify-content:center;margin-bottom:14px">Windows Execution Tools</div>
+    <h1 class="page-h">Everything You<br>Need to Execute</h1>
+    <p class="page-p">Every feature engineered for raw performance, absolute stealth, and developer-grade precision.</p>
+  </div>
+
+  <div class="cards-grid">
+    <div class="tcard"><div class="tc-icon">⚡</div><div class="tc-name">Fast Injection</div><div class="tc-desc">Sub-50ms attach and execute before any game-side detection can fire. Precision engineered for zero-latency injection.</div><span class="tc-tag hot">Core</span></div>
+    <div class="tcard"><div class="tc-icon">🔁</div><div class="tc-name">Multi Instance</div><div class="tc-desc">Run unlimited Roblox instances simultaneously. Farm, grind, and dominate multiple sessions with a single executor window.</div><span class="tc-tag hot">Power</span></div>
+    <div class="tcard"><div class="tc-icon">🔗</div><div class="tc-name">Multi-Client Injection</div><div class="tc-desc">Inject the same script across all active clients in one click. Total control over every session you're running — instantly.</div><span class="tc-tag hot">New</span></div>
+    <div class="tcard"><div class="tc-icon">📡</div><div class="tc-name">External Remote Spy</div><div class="tc-desc">Runs as an entirely separate process outside the game's memory. Intercepts all RemoteEvents and RemoteFunctions in real-time. Games literally cannot see it.</div><span class="tc-tag hot">Dev</span></div>
+    <div class="tcard"><div class="tc-icon">✅</div><div class="tc-name">100% UNC</div><div class="tc-desc">Full Unified Naming Convention compliance. Every function works exactly as documented — no surprises, no missing implementations.</div><span class="tc-tag">Verified</span></div>
+    <div class="tcard"><div class="tc-icon">🔄</div><div class="tc-name">Max Sync</div><div class="tc-desc">Real-time state synchronization across all active sessions. Your scripts, variables, and state stay consistent with zero drift.</div><span class="tc-tag">Core</span></div>
+    <div class="tcard"><div class="tc-icon">💾</div><div class="tc-name">Auto File Save</div><div class="tc-desc">Scripts save automatically as you type. Full version history with one-click restore. Never lose a line of code again.</div><span class="tc-tag">QOL</span></div>
+    <div class="tcard"><div class="tc-icon">🎨</div><div class="tc-name">Theme Customization</div><div class="tc-desc">Personalize your workspace completely. Custom themes, accent colors, font sizes, and layout modes — make it yours.</div><span class="tc-tag">QOL</span></div>
+    <div class="tcard"><div class="tc-icon">📂</div><div class="tc-name">Script Library</div><div class="tc-desc">Organize all your scripts into folders, tag them by game, and load in one click. Your personal script vault, always accessible.</div><span class="tc-tag">QOL</span></div>
+  </div>
+
+  <div class="inj-section">
+    <div class="inj-grid">
+      <div>
+        <div class="section-tag">Stealth Engine</div>
+        <h2 class="section-h" style="font-size:clamp(32px,4vw,52px)">Games Can't<br>See It Coming</h2>
+        <p class="section-p" style="margin-bottom:0">Our external remote spy operates as an independent system process with zero footprint inside the game's memory space.</p>
+        <div class="inj-steps">
+          <div class="inj-step"><div class="inj-num">01</div><div><div class="inj-title">Drag &amp; Drop</div><div class="inj-desc">Drop your executable into Incognito's suite. No config files. No setup scripts. Done in seconds.</div></div></div>
+          <div class="inj-step"><div class="inj-num">02</div><div><div class="inj-title">Silent Attach</div><div class="inj-desc">Sub-50ms attach with our proprietary injection method. No known signatures. No detection vectors.</div></div></div>
+          <div class="inj-step"><div class="inj-num">03</div><div><div class="inj-title">Execute &amp; Monitor</div><div class="inj-desc">Run your scripts, spy remotes externally, and manage all instances from one clean dashboard.</div></div></div>
+        </div>
+      </div>
+      <div class="inj-visual">
+        <div class="inj-v-top"><span>REMOTE SPY — LIVE FEED</span><div class="inj-status"><div class="inj-sdot"></div>UNDETECTED</div></div>
+        <div class="inj-body">
+          <span class="dim">-- Process: External · PID: 7821</span><br>
+          <span class="dim">-- Detection surface: 0.00%</span><br><br>
+          <span class="ok">FIRED</span>&nbsp; ReplicatedStorage.Events.<span style="color:rgba(255,255,255,0.7)">DamagePlayer</span><br>
+          &nbsp;&nbsp;Args: [{ UserId: <span style="color:#fff">1234567</span> }, <span style="color:#fff">50</span>]<br><br>
+          <span class="ok">INVOKE</span> ReplicatedStorage.Fn.<span style="color:rgba(255,255,255,0.7)">GetPlayerData</span><br>
+          &nbsp;&nbsp;Returns: { coins: <span style="color:#fff">9400</span>, level: <span style="color:#fff">88</span> }<br><br>
+          <span class="dim">-- 847 remotes intercepted this session</span><br>
+          <span class="ok">STATUS</span>&nbsp; <span style="color:rgba(255,255,255,0.55)">ALL SYSTEMS NOMINAL ●</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-wrap"><footer>
+    <img src="https://i.ibb.co/Ps6YjC6r/1056-removebg-preview.png" alt="" class="ft-logo">
+    <ul class="ft-links"><li><a href="#" data-nav="home">Home</a></li><li><a href="#" data-nav="pricing">Pricing</a></li><li><a href="https://discord.gg/csvH4jfRcA" target="_blank">Discord</a></li></ul>
+    <div class="ft-copy">© 2026 Incognito</div>
+  </footer></div>
+</div>
+
+<!-- ════ ABOUT ════ -->
+<div id="page-about" class="page">
+  <div class="page-hero">
+    <div class="section-tag" style="justify-content:center;margin-bottom:14px">About</div>
+    <h1 class="page-h">Software Security,<br>Simplified</h1>
+    <p class="page-p">Incognito was built by executors, for executors. We know what you need — and we built it right.</p>
+  </div>
+  <div class="about-grid">
+    <div>
+      <div class="about-block reveal"><div class="ab-title">What is Incognito?</div><div class="ab-body">Incognito is a next-generation Roblox executor with a single obsession: stay invisible. Our injector uses a fully external architecture — no hooks inside the game process, no signatures, no detection surface. Just clean, fast execution.</div></div>
+      <div class="about-block reveal"><div class="ab-title">Why we built it</div><div class="ab-body">Every other executor makes compromises. We didn't. We rebuilt the injection pipeline from scratch — external remote spy, multi-client support, and 100% UNC compliance shipped on day one, not as an afterthought.</div></div>
+      <div class="about-block reveal"><div class="ab-title">For developers too</div><div class="ab-body">The external remote spy is a first-class developer tool. Intercept remotes, debug networking logic, and reverse-engineer game systems — all from a process the game cannot detect or block.</div></div>
+    </div>
+    <div>
+      <div class="about-block reveal"><div class="ab-num">100%</div><div class="ab-title">UNC Compliance</div><div class="ab-body">Every standard function implemented correctly — not just stubbed out.</div></div>
+      <div class="about-block reveal"><div class="ab-num">&lt;50ms</div><div class="ab-title">Injection Speed</div><div class="ab-body">Attach before anti-cheat can respond. Our sub-50ms pipeline is the fastest available.</div></div>
+      <div class="about-block reveal"><div class="ab-num">0</div><div class="ab-title">Detections to Date</div><div class="ab-body">External architecture means zero known detections since launch. We intend to keep it that way.</div></div>
+    </div>
+  </div>
+  <div class="footer-wrap"><footer>
+    <img src="https://i.ibb.co/Ps6YjC6r/1056-removebg-preview.png" alt="" class="ft-logo">
+    <ul class="ft-links"><li><a href="#" data-nav="home">Home</a></li><li><a href="#" data-nav="features">Features</a></li><li><a href="https://discord.gg/csvH4jfRcA" target="_blank">Discord</a></li></ul>
+    <div class="ft-copy">© 2026 Incognito</div>
+  </footer></div>
+</div>
+
+<!-- ════ PRICING ════ -->
+<div id="page-pricing" class="page">
+  <div class="page-hero">
+    <div class="section-tag" style="justify-content:center;margin-bottom:14px">Pricing</div>
+    <h1 class="page-h">Simple Pricing.<br>No Surprises.</h1>
+    <p class="page-p">Start free with our key system, or go keyless for life with a single one-time payment.</p>
+  </div>
+  <div class="pricing-wrap">
+    <div class="pricing-cards reveal">
+      <div class="pcard">
+        <div class="pc-plan">Key System</div>
+        <div class="pc-price">FREE</div>
+        <div class="pc-period">Renew your key periodically</div>
+        <ul class="pc-list">
+          <li class="yes">Fast Injection</li>
+          <li class="yes">Multi Instance</li>
+          <li class="yes">100% UNC</li>
+          <li class="yes">Auto File Save</li>
+          <li class="yes">Script Library</li>
+          <li class="yes">Theme Customization</li>
+          <li class="no">External Remote Spy</li>
+          <li class="no">Multi-Client Injection</li>
+          <li class="no">Max Sync</li>
+        </ul>
+        <a href="https://pornhub.com" target="_blank" class="btn-ghost" style="width:100%;text-align:center;display:block;padding:12px">Download w/key system →</a>
+      </div>
+      <div class="pcard featured">
+        <div class="pc-plan">Lifetime Keyless</div>
+        <div class="pc-price">$15</div>
+        <div class="pc-period">One-time · No renewals · Ever</div>
+        <ul class="pc-list">
+          <li class="yes">Fast Injection</li>
+          <li class="yes">Multi Instance</li>
+          <li class="yes">100% UNC</li>
+          <li class="yes">Auto File Save</li>
+          <li class="yes">Script Library</li>
+          <li class="yes">Theme Customization</li>
+          <li class="yes">External Remote Spy</li>
+          <li class="yes">Multi-Client Injection</li>
+          <li class="yes">Max Sync</li>
+        </ul>
+        <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-solid" style="width:100%;text-align:center;display:block;justify-content:center;padding:12px 0">Buy Lifetime — $15 →</a>
+      </div>
+    </div>
+    <div style="border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:26px 30px;margin-top:18px;background:#0e1210;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px" class="reveal">
+      <div><div style="font-size:14px;font-weight:600;margin-bottom:6px">Need help choosing?</div><div style="font-size:13px;color:rgba(255,255,255,0.4)">Our team is on Discord 24/7. Ask anything before you buy.</div></div>
+      <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-ghost">Open Discord →</a>
+    </div>
+  </div>
+  <div class="footer-wrap"><footer>
+    <img src="https://i.ibb.co/Ps6YjC6r/1056-removebg-preview.png" alt="" class="ft-logo">
+    <ul class="ft-links"><li><a href="#" data-nav="home">Home</a></li><li><a href="#" data-nav="features">Features</a></li><li><a href="https://discord.gg/csvH4jfRcA" target="_blank">Discord</a></li></ul>
+    <div class="ft-copy">© 2026 Incognito</div>
+  </footer></div>
+</div>
+
+<!-- ════ COMMUNITY ════ -->
+<div id="page-community" class="page">
+  <div class="page-hero">
+    <div class="section-tag" style="justify-content:center;margin-bottom:14px">Community</div>
+    <h1 class="page-h">Join the<br>Community</h1>
+    <p class="page-p">Connect with hundreds of users, get instant support, and stay updated on every release.</p>
+  </div>
+  <div class="community-wrap">
+    <div class="discord-card reveal">
+      <div class="dc-icon">💬</div>
+      <h2 class="dc-title">Official Discord Server</h2>
+      <p class="dc-sub">Our Discord is the home base for Incognito. Get your key, buy lifetime, get support, and share scripts — all in one place.</p>
+      <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-solid btn-lg">Join Discord →</a>
+    </div>
+    <div class="sup-grid reveal">
+      <div class="sup-card"><div class="sup-icon">🔑</div><div class="sup-title">Key Distribution</div><div class="sup-desc">Get your free key and daily renewals directly through Discord bots.</div></div>
+      <div class="sup-card"><div class="sup-icon">🛒</div><div class="sup-title">Lifetime Purchase</div><div class="sup-desc">Buy your $15 lifetime plan securely through our verified Discord store.</div></div>
+      <div class="sup-card"><div class="sup-icon">🛠</div><div class="sup-title">24/7 Support</div><div class="sup-desc">Open a ticket any time. Our team responds fast, every day of the week.</div></div>
+      <div class="sup-card"><div class="sup-icon">📢</div><div class="sup-title">Announcements</div><div class="sup-desc">Be first to know about updates, new features, and detection status.</div></div>
+      <div class="sup-card"><div class="sup-icon">📜</div><div class="sup-title">Script Sharing</div><div class="sup-desc">Community-curated scripts, loadstrings, and hub links posted daily.</div></div>
+      <div class="sup-card"><div class="sup-icon">🤝</div><div class="sup-title">Developer Zone</div><div class="sup-desc">Remote spy tips, API guides, and developer discussions for power users.</div></div>
+    </div>
+  </div>
+  <div class="footer-wrap"><footer>
+    <img src="https://i.ibb.co/Ps6YjC6r/1056-removebg-preview.png" alt="" class="ft-logo">
+    <ul class="ft-links"><li><a href="#" data-nav="home">Home</a></li><li><a href="#" data-nav="features">Features</a></li><li><a href="#" data-nav="pricing">Pricing</a></li></ul>
+    <div class="ft-copy">© 2026 Incognito</div>
+  </footer></div>
+</div>
+
+<script>
+// ── CURSOR
+const dot=document.getElementById('cur-dot'),cross=document.getElementById('cur-cross'),ring=document.getElementById('cur-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX;my=e.clientY;
+  dot.style.left=mx+'px';dot.style.top=my+'px';
+  cross.style.left=mx+'px';cross.style.top=my+'px';
+});
+(function loop(){rx+=(mx-rx)*0.09;ry+=(my-ry)*0.09;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(loop)})();
+document.querySelectorAll('a,button,.tcard,.pcard,.about-block,.sup-card').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{dot.style.width='14px';dot.style.height='14px';ring.style.width='60px';ring.style.height='60px';ring.style.borderColor='rgba(255,255,255,0.35)'});
+  el.addEventListener('mouseleave',()=>{dot.style.width='8px';dot.style.height='8px';ring.style.width='44px';ring.style.height='44px';ring.style.borderColor='rgba(255,255,255,0.2)'});
+});
+
+// ── ROUTING
+function goPage(id){
+  document.querySelectorAll('.page').forEach(p=>{p.classList.remove('active');p.style.display='none'});
+  const pg=document.getElementById('page-'+id);
+  pg.style.display='block';
+  void pg.offsetWidth;
+  pg.classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+  document.querySelectorAll('.nav-links a').forEach(a=>a.classList.toggle('active',a.dataset.nav===id));
+  setTimeout(runReveal,80);
+  initTilt();
+}
+document.querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();goPage(el.dataset.nav)}));
+
+// ── 3D TILT
+function initTilt(){
+  document.querySelectorAll('.tcard').forEach(card=>{
+    card.addEventListener('mousemove',e=>{
+      const r=card.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+      const cx=r.width/2,cy=r.height/2;
+      card.style.transform=`perspective(900px) rotateX(${-((y-cy)/cy)*9}deg) rotateY(${((x-cx)/cx)*11}deg) scale3d(1.025,1.025,1.025)`;
+      card.style.setProperty('--mx',(x/r.width*100)+'%');
+      card.style.setProperty('--my',(y/r.height*100)+'%');
+    });
+    card.addEventListener('mouseleave',()=>{card.style.transform='perspective(900px) rotateX(0) rotateY(0) scale3d(1,1,1)'});
+  });
+}
+initTilt();
+
+// ── SCROLL REVEAL
+function runReveal(){
+  document.querySelectorAll('.reveal:not(.vis)').forEach((el,i)=>{
+    const obs=new IntersectionObserver(entries=>{
+      entries.forEach(e=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('vis'),i*70);obs.unobserve(e.target)}});
+    },{threshold:0.08});
+    obs.observe(el);
+  });
+}
+runReveal();
+</script>
+</body>
+</html>

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incognito — Your Key</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#0b0e0c;color:#fff;
+  font-family:'Sora',sans-serif;
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  overflow:hidden;cursor:none;
+}
+
+/* BG */
+.bg-grid{
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.022) 1px,transparent 1px);
+  background-size:64px 64px;
+  pointer-events:none;z-index:0;
+}
+.bg-noise{position:fixed;inset:0;opacity:.018;pointer-events:none;z-index:1;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+.glow{position:fixed;width:700px;height:500px;
+  background:radial-gradient(ellipse,rgba(255,255,255,0.04),transparent 68%);
+  top:50%;left:50%;transform:translate(-50%,-55%);pointer-events:none;z-index:0;}
+
+/* CURSOR */
+#cur{position:fixed;width:22px;height:22px;pointer-events:none;z-index:9999;transform:translate(-50%,-50%)}
+#cur::before,#cur::after{content:'';position:absolute;background:rgba(255,255,255,0.7);border-radius:1px}
+#cur::before{width:1px;height:100%;left:50%;top:0;transform:translateX(-50%)}
+#cur::after{width:100%;height:1px;top:50%;left:0;transform:translateY(-50%)}
+#cur-ring{position:fixed;width:42px;height:42px;border:1px solid rgba(255,255,255,0.18);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%)}
+
+/* CARD */
+.card{
+  position:relative;z-index:2;
+  width:min(560px,calc(100vw - 40px));
+  background:rgba(14,18,16,0.96);
+  border:1px solid rgba(255,255,255,0.09);
+  border-radius:24px;
+  padding:48px 44px 40px;
+  text-align:center;
+  box-shadow:0 40px 80px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Loading state */
+#state-loading{animation:fadeIn .4s ease both}
+#state-key{display:none;animation:fadeIn .5s ease both}
+#state-error{display:none;animation:fadeIn .4s ease both}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.spinner{width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,0.08);border-top-color:rgba(255,255,255,0.6);animation:spin .8s linear infinite;margin:0 auto 24px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.logo{height:44px;width:auto;filter:brightness(0) invert(1);margin-bottom:30px}
+
+/* SUCCESS ICON */
+.success-icon{
+  width:72px;height:72px;border-radius:50%;
+  border:1px solid rgba(255,255,255,0.18);
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 26px;
+  font-size:32px;
+  background:rgba(255,255,255,0.04);
+  animation:popIn .5s .1s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+
+.key-title{
+  font-size:26px;font-weight:800;letter-spacing:-.03em;
+  margin-bottom:8px;
+}
+.key-sub{
+  font-size:13.5px;color:rgba(255,255,255,0.4);
+  line-height:1.7;margin-bottom:30px;
+}
+
+/* KEY BOX */
+.key-box{
+  background:rgba(0,0,0,0.4);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:14px;
+  padding:18px 20px;
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:14px;
+  cursor:pointer;
+  transition:border-color .2s,background .2s;
+  position:relative;
+  overflow:hidden;
+}
+.key-box::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at var(--mx,50%) 50%,rgba(255,255,255,0.04),transparent 70%);
+  opacity:0;transition:opacity .3s;
+}
+.key-box:hover{border-color:rgba(255,255,255,0.22);background:rgba(255,255,255,0.03);}
+.key-box:hover::before{opacity:1;}
+.key-text{
+  flex:1;font-family:'JetBrains Mono',monospace;font-size:12px;
+  color:rgba(255,255,255,0.75);letter-spacing:.03em;
+  word-break:break-all;text-align:left;line-height:1.5;
+}
+.copy-icon{
+  width:32px;height:32px;flex-shrink:0;
+  border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;transition:background .2s;
+}
+.key-box:hover .copy-icon{background:rgba(255,255,255,0.08);}
+
+/* Copy toast */
+.copy-toast{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:rgba(255,255,255,0.95);color:#000;
+  font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;
+  padding:6px 16px;border-radius:100px;
+  opacity:0;pointer-events:none;transition:opacity .15s;
+  white-space:nowrap;
+}
+.copy-toast.show{opacity:1;}
+
+/* EXPIRY NOTICE */
+.expiry-note{
+  font-size:11px;font-family:'JetBrains Mono',monospace;
+  color:rgba(255,255,255,0.25);margin-bottom:26px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.expiry-note::before{content:'⏱';font-size:12px;}
+
+/* DIVIDER */
+.card-divider{height:1px;background:rgba(255,255,255,0.07);margin:24px 0;}
+
+/* ACTION BUTTONS */
+.action-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+.btn-solid{
+  padding:10px 22px;background:#fff;color:#000;
+  font-size:13px;font-weight:700;font-family:'Sora',sans-serif;
+  border:none;border-radius:100px;cursor:pointer;
+  transition:background .2s,transform .2s;text-decoration:none;
+  display:inline-flex;align-items:center;gap:7px;
+}
+.btn-solid:hover{background:#e8e8e8;transform:translateY(-1px)}
+.btn-ghost{
+  padding:10px 22px;border:1px solid rgba(255,255,255,0.13);
+  background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.6);
+  font-size:13px;font-weight:500;font-family:'Sora',sans-serif;
+  border-radius:100px;cursor:pointer;transition:all .2s;text-decoration:none;
+}
+.btn-ghost:hover{border-color:rgba(255,255,255,0.3);color:#fff}
+
+/* FOOTER */
+.card-footer{
+  margin-top:24px;padding-top:18px;
+  border-top:1px solid rgba(255,255,255,0.06);
+  font-size:11px;font-family:'JetBrains Mono',monospace;
+  color:rgba(255,255,255,0.2);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.status-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:100px;
+  border:1px solid rgba(255,255,255,0.1);font-size:10px;
+}
+.sdot{width:5px;height:5px;border-radius:50%;background:#fff;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ERROR */
+.err-icon{font-size:36px;margin-bottom:14px}
+.err-title{font-size:18px;font-weight:700;margin-bottom:8px}
+.err-msg{font-size:12px;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.4);
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+  border-radius:10px;padding:12px 16px;margin-bottom:18px;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-noise"></div>
+<div class="glow"></div>
+<div id="cur"></div>
+<div id="cur-ring"></div>
+
+<div class="card">
+
+  <!-- Loading -->
+  <div id="state-loading">
+    <img src="https://i.ibb.co/bgTn718C/1122.png" alt="Incognito" class="logo">
+    <div class="spinner"></div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px">Fetching your key...</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.4)">Just a moment.</div>
+  </div>
+
+  <!-- Key display -->
+  <div id="state-key">
+    <img src="https://i.ibb.co/bgTn718C/1122.png" alt="Incognito" class="logo">
+
+    <div class="success-icon">✓</div>
+    <div class="key-title">Your Key is Ready</div>
+    <div class="key-sub">
+      Click the key below to copy it, then paste it into<br>the Incognito executor.
+    </div>
+
+    <div class="key-box" id="key-box" onclick="copyKey()">
+      <div class="key-text" id="key-display">loading...</div>
+      <div class="copy-icon" id="copy-icon">📋</div>
+      <div class="copy-toast" id="copy-toast">Copied!</div>
+    </div>
+
+    <div class="expiry-note" id="expiry-note">Valid for 24 hours</div>
+
+    <div class="card-divider"></div>
+
+    <div class="action-row">
+      <button class="btn-solid" onclick="copyKey()">Copy Key</button>
+      <a href="/" class="btn-ghost">← Back to Site</a>
+      <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-ghost">Discord</a>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="state-error">
+    <img src="https://i.ibb.co/bgTn718C/1122.png" alt="Incognito" class="logo">
+    <div class="err-icon">⚠</div>
+    <div class="err-title" id="err-title">Could not fetch key</div>
+    <div class="err-msg" id="err-msg">Unknown error</div>
+    <div class="action-row">
+      <a href="/" class="btn-solid">← Back to Home</a>
+      <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-ghost">Get Support</a>
+    </div>
+  </div>
+
+  <div class="card-footer">
+    <span>incognito key system</span>
+    <span class="status-pill"><span class="sdot"></span> UNDETECTED</span>
+  </div>
+</div>
+
+<script>
+// Cursor
+const cur  = document.getElementById('cur');
+const ring = document.getElementById('cur-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
+(function loop(){ rx+=(mx-rx)*.1; ry+=(my-ry)*.1; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(loop); })();
+
+let theKey = null;
+
+function show(id) {
+  ['state-loading','state-key','state-error'].forEach(s => {
+    document.getElementById(s).style.display = s === id ? 'block' : 'none';
+  });
+}
+
+function getCookie(name) {
+  const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return m ? m.pop() : null;
+}
+
+async function fetchKey(sid) {
+  const res = await fetch(`/api/get-key?sid=${sid}`);
+  return res.json();
+}
+
+async function init() {
+  const params = new URLSearchParams(location.search);
+  const sid    = params.get('sid') || getCookie('incognito_sid');
+
+  if (!sid) {
+    show('state-error');
+    document.getElementById('err-title').textContent = 'No Session Found';
+    document.getElementById('err-msg').textContent   = 'Your session could not be found. Please restart the key process from the executor.';
+    return;
+  }
+
+  // Try cookie key first (set by gate.html for speed)
+  const cookieKey = getCookie('incognito_key');
+  if (cookieKey && cookieKey.startsWith('incognito_')) {
+    displayKey(cookieKey, null);
+    return;
+  }
+
+  // Otherwise fetch from API
+  let data;
+  try { data = await fetchKey(sid); }
+  catch {
+    show('state-error');
+    document.getElementById('err-title').textContent = 'Network Error';
+    document.getElementById('err-msg').textContent = 'Could not connect to server. Check your internet connection.';
+    return;
+  }
+
+  if (!data.ok) {
+    show('state-error');
+    document.getElementById('err-title').textContent = 'Key Error';
+    document.getElementById('err-msg').textContent = data.error || 'Failed to fetch key.';
+    return;
+  }
+
+  displayKey(data.key, data.expiresAt);
+}
+
+function displayKey(key, expiresAt) {
+  theKey = key;
+  document.getElementById('key-display').textContent = key;
+  if (expiresAt) {
+    const d = new Date(expiresAt);
+    document.getElementById('expiry-note').textContent =
+      `⏱ Expires ${d.toLocaleDateString()} at ${d.toLocaleTimeString()}`;
+  }
+  show('state-key');
+}
+
+function copyKey() {
+  if (!theKey) return;
+  navigator.clipboard.writeText(theKey).then(() => {
+    const toast = document.getElementById('copy-toast');
+    const icon  = document.getElementById('copy-icon');
+    icon.textContent = '✓';
+    toast.classList.add('show');
+    setTimeout(() => { toast.classList.remove('show'); icon.textContent = '📋'; }, 1800);
+  });
+}
+
+// Key box shimmer on hover
+document.getElementById('key-box').addEventListener('mousemove', e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  const x = ((e.clientX - r.left) / r.width * 100).toFixed(1);
+  e.currentTarget.style.setProperty('--mx', x + '%');
+});
+
+init();
+</script>
+</body>
+</html>

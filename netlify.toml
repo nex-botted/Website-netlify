@@ -1,0 +1,12 @@
+# Block direct source access attempts
+[[redirects]]
+  from = "/netlify/functions/*.js"
+  to = "/403.html"
+  status = 403
+  force = true
+
+[[redirects]]
+  from = "/netlify/functions/*.mjs"
+  to = "/403.html"
+  status = 403
+  force = true
