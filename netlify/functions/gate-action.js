@@ -34,7 +34,12 @@ export async function handler(event, context) {
     return json({ ok: false, error: 'Missing or invalid parameters' }, 400);
   }
 
-  const store = getStore({ name: 'incognito-sessions', consistency: 'strong' });
+  const store =const store = getStore({
+  name: 'incognito-sessions',
+  consistency: 'strong',
+  siteID: process.env.NETLIFY_SITE_ID,
+  token: process.env.NETLIFY_AUTH_TOKEN
+});
 
   const session = await store.get(`session:${sid}`, { type: 'json' });
 
