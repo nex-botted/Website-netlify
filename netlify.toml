@@ -1,3 +1,6 @@
+[functions]
+  node_bundler = "esbuild"
+
 # Block direct source access attempts
 [[redirects]]
   from = "/netlify/functions/*.js"
