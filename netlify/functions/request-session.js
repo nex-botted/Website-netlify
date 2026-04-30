@@ -1,18 +1,9 @@
-/**
- * POST /api/request-session
- * 
- * Called by the Incognito executor to begin the key gate flow.
- * 
- * Body:  { hwid: "<128-char hex SHA-512>" }
- * Returns: { ok, sessionId, gateUrl, expiresIn }
- */
+const { getStore } = require('@netlify/blobs');
+const crypto = require('crypto');
+const { hashHwid } = require('./shared/crypto');
 
-import { getStore } from '@netlify/blobs';
-import crypto from 'crypto';
-import { hashHwid } from './shared/crypto.js';
-
-const SESSION_TTL_MS  = 30 * 60 * 1000;   // 30 minutes
-const HWID_RATE_LIMIT = 3;                 // max new sessions per HWID per hour
+const SESSION_TTL_MS  = 30 * 60 * 1000;
+const HWID_RATE_LIMIT = 3;
 
 function json(data, status = 200) {
   return {
@@ -22,7 +13,7 @@ function json(data, status = 200) {
   };
 }
 
-export async function handler(event, context) {
+exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
   }
@@ -36,7 +27,6 @@ export async function handler(event, context) {
 
   const { hwid } = body;
 
-  // Validate HWID
   if (typeof hwid !== 'string' || !/^[0-9a-f]{128}$/i.test(hwid)) {
     return json({
       ok: false,
@@ -51,16 +41,15 @@ export async function handler(event, context) {
     return json({ ok: false, error: 'Server configuration error.' }, 500);
   }
 
-  const store = const store = getStore({
-  name: 'incognito-sessions',
-  consistency: 'strong',
-  siteID: process.env.NETLIFY_SITE_ID,
-  token: process.env.NETLIFY_AUTH_TOKEN
-});
+  const store = getStore({
+    name: 'incognito-sessions',
+    consistency: 'strong',
+    siteID: process.env.NETLIFY_SITE_ID,
+    token: process.env.NETLIFY_AUTH_TOKEN
+  });
 
   const now = Date.now();
 
-  // ── Per-HWID rate limiting ──
   const rlKey = `rl:hwid:${hwidHash}`;
   const rlRaw = await store.get(rlKey, { type: 'json' });
 
@@ -71,7 +60,7 @@ export async function handler(event, context) {
     const retryAfter = Math.ceil((recent[0] + 3600_000 - now) / 1000);
     return json({
       ok: false,
-      error: 'Too many key requests from this machine. Try again later.',
+      error: 'Too many key requests from this machine.',
       retryAfter
     }, 429);
   }
@@ -79,7 +68,6 @@ export async function handler(event, context) {
   recent.push(now);
   await store.setJSON(rlKey, { timestamps: recent });
 
-  // ── IP rate limiting ──
   const ip =
     event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
     event.headers['client-ip'] ||
@@ -91,13 +79,12 @@ export async function handler(event, context) {
   const ipRecent = ((ipRaw?.timestamps) || []).filter(ts => ts > now - 600_000);
 
   if (ipRecent.length >= 10) {
-    return json({ ok: false, error: 'Rate limit exceeded. Please wait.' }, 429);
+    return json({ ok: false, error: 'Rate limit exceeded.' }, 429);
   }
 
   ipRecent.push(now);
   await store.setJSON(ipKey, { timestamps: ipRecent });
 
-  // ── Create session ──
   const sessionId = crypto.randomUUID().replace(/-/g, '');
 
   const session = {
@@ -113,7 +100,6 @@ export async function handler(event, context) {
 
   await store.setJSON(`session:${sessionId}`, session);
 
-  // Build base URL correctly
   const reqUrl = new URL(event.rawUrl);
   const baseUrl = `${reqUrl.protocol}//${reqUrl.host}`;
 
@@ -123,6 +109,6 @@ export async function handler(event, context) {
     gateUrl: `${baseUrl}/gate?step=1&sid=${sessionId}`,
     expiresIn: SESSION_TTL_MS / 1000,
   }, 201);
-}
+};
 
-export const config = { path: '/api/request-session' };
+exports.config = { path: '/api/request-session' };
