@@ -1,7 +1,6 @@
 {
   "name": "incognito-key-system",
   "version": "1.0.0",
-  "type": "module",
   "dependencies": {
     "@netlify/blobs": "^8.0.0",
     "crypto-js": "^4.2.0"
