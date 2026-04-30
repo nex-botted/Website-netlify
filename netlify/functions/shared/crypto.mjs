@@ -29,7 +29,7 @@ export function b58enc(buf) {
 // Sig = HMAC-SHA256(v1 + keyId + entropy, KEY_PEPPER) truncated to 12 bytes
 
 export function getPepper() {
-  const p = Netlify.env.get('KEY_PEPPER');
+  const p = process.env.KEY_PEPPER;
   if (!p) throw new Error('KEY_PEPPER env var is not set');
   return p;
 }
@@ -105,22 +105,39 @@ export function verifyToken(token) {
     const pepper = getPepper();
     const [b64, mac] = token.split('.');
     if (!b64 || !mac) return null;
+
     const payload = Buffer.from(b64, 'base64url').toString('utf8');
-    const expected = crypto.createHmac('sha256', pepper).update(payload).digest('hex').slice(0, 16);
-    if (!crypto.timingSafeEqual(Buffer.from(mac, 'utf8'), Buffer.from(expected, 'utf8'))) return null;
+    const expected = crypto.createHmac('sha256', pepper)
+      .update(payload)
+      .digest('hex')
+      .slice(0, 16);
+
+    if (mac.length !== expected.length) return null;
+    if (!crypto.timingSafeEqual(Buffer.from(mac), Buffer.from(expected))) return null;
+
     return JSON.parse(payload);
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 // ── AES-256-GCM payload encryption for executor verify responses ──────────────
 export function encryptPayload(obj, sessionSaltHex) {
-  const masterKey = Netlify.env.get('AES_MASTER_KEY');
+  const masterKey = process.env.AES_MASTER_KEY;
   if (!masterKey) throw new Error('AES_MASTER_KEY not set');
+
   const salt = Buffer.from(sessionSaltHex, 'hex');
   const key  = crypto.hkdfSync('sha256', Buffer.from(masterKey, 'hex'), salt, Buffer.from('incognito-v1'), 32);
   const iv   = crypto.randomBytes(12);
   const c    = crypto.createCipheriv('aes-256-gcm', key, iv);
+
   const ct   = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]);
   const tag  = c.getAuthTag();
-  return { iv: iv.toString('hex'), salt: sessionSaltHex, tag: tag.toString('hex'), ct: ct.toString('hex') };
+
+  return {
+    iv: iv.toString('hex'),
+    salt: sessionSaltHex,
+    tag: tag.toString('hex'),
+    ct: ct.toString('hex')
+  };
 }
