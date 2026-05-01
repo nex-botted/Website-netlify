@@ -1,4 +1,5 @@
 const { getStore } = require('@netlify/blobs');
+const crypto = require('crypto');
 const {
   verifyKeySignature,
   hashHwid,
@@ -31,6 +32,10 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Missing parameters' }, 400);
   }
 
+  if (!/^[a-f0-9]{32}$/i.test(sid)) {
+    return json({ ok: false, error: 'Invalid session' }, 400);
+  }
+
   if (!/^[0-9a-f]{128}$/i.test(hwid)) {
     return json({ ok: false, error: 'Invalid HWID format' }, 400);
   }
@@ -60,7 +65,13 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'HWID mismatch' }, 403);
   }
 
-  if (!session.key || session.key !== key) {
+  if (!session.key || typeof session.key !== 'string') {
+    return json({ ok: false, error: 'Key mismatch' }, 403);
+  }
+
+  const providedKey = Buffer.from(String(key));
+  const storedKey = Buffer.from(session.key);
+  if (providedKey.length !== storedKey.length || !crypto.timingSafeEqual(providedKey, storedKey)) {
     return json({ ok: false, error: 'Key mismatch' }, 403);
   }
 

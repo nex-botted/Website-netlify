@@ -14,8 +14,8 @@ exports.handler = async (event) => {
   }
 
   const sessionId = event.queryStringParameters?.sid;
-  if (!sessionId) {
-    return json({ ok: false, error: 'Missing session ID' }, 400);
+  if (typeof sessionId !== 'string' || !/^[a-f0-9]{32}$/i.test(sessionId)) {
+    return json({ ok: false, error: 'Invalid session' }, 400);
   }
 
   const store = getStore({

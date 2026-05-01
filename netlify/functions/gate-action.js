@@ -31,7 +31,7 @@ exports.handler = async (event) => {
 
   const { sessionId, action } = body || {};
 
-  if (typeof sessionId !== 'string' || sessionId.length < 16) {
+  if (typeof sessionId !== 'string' || !/^[a-f0-9]{32}$/i.test(sessionId)) {
     return invalid();
   }
 
