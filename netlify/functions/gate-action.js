@@ -98,21 +98,28 @@ exports.handler = async (event) => {
 
     session.step = 4;
 
-    const keyValue = Math.random().toString(36).slice(2, 12).toUpperCase();
-    session.key = keyValue;
+const keyValue = require('crypto')
+  .randomBytes(6)
+  .toString('hex')
+  .toUpperCase();
+
+session.key = keyValue;
+
+// ✅ ADD THIS
+session.keyExpiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
 
     await store.setJSON(key, session);
 
     return json({ ok: true, key: keyValue });
   }
 
-  else {
-    return json({ ok: false, error: 'Invalid action' });
-  }
+else {
+  return json({ ok: false, error: 'Invalid action' });
+}
 
-  await store.setJSON(key, session);
+await store.setJSON(key, session);
 
-  return json({ ok: true });
+return json({ ok: true });
 };
 
 exports.config = { path: '/api/gate-action' };
