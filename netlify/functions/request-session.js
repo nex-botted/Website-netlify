@@ -1,6 +1,3 @@
-console.log("SITE_ID =", process.env.NETLIFY_SITE_ID);
-console.log("TOKEN =", process.env.NETLIFY_AUTH_TOKEN ? "exists" : "missing");
-
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
 const { hashHwid } = require('./shared/crypto');
@@ -17,6 +14,12 @@ function json(data, status = 200) {
 }
 
 exports.handler = async (event, context) => {
+  // 🔥 DEBUG LOGS (will show in Netlify logs)
+  console.log("=== REQUEST SESSION HIT ===");
+  console.log("Method:", event.httpMethod);
+  console.log("SITE_ID:", process.env.NETLIFY_SITE_ID || "MISSING");
+  console.log("TOKEN:", process.env.NETLIFY_AUTH_TOKEN ? "EXISTS" : "MISSING");
+
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
   }
@@ -40,8 +43,15 @@ exports.handler = async (event, context) => {
   let hwidHash;
   try {
     hwidHash = hashHwid(hwid);
-  } catch {
+  } catch (err) {
+    console.log("HASH ERROR:", err.message);
     return json({ ok: false, error: 'Server configuration error.' }, 500);
+  }
+
+  // ❗ Hard fail if env missing (so you SEE it clearly)
+  if (!process.env.NETLIFY_SITE_ID || !process.env.NETLIFY_AUTH_TOKEN) {
+    console.log("❌ ENV VARS MISSING");
+    return json({ ok: false, error: 'Missing Netlify Blobs config' }, 500);
   }
 
   const store = getStore({
@@ -53,6 +63,7 @@ exports.handler = async (event, context) => {
 
   const now = Date.now();
 
+  // ── HWID rate limit ──
   const rlKey = `rl:hwid:${hwidHash}`;
   const rlRaw = await store.get(rlKey, { type: 'json' });
 
@@ -71,6 +82,7 @@ exports.handler = async (event, context) => {
   recent.push(now);
   await store.setJSON(rlKey, { timestamps: recent });
 
+  // ── IP rate limit ──
   const ip =
     event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
     event.headers['client-ip'] ||
@@ -88,6 +100,7 @@ exports.handler = async (event, context) => {
   ipRecent.push(now);
   await store.setJSON(ipKey, { timestamps: ipRecent });
 
+  // ── Create session ──
   const sessionId = crypto.randomUUID().replace(/-/g, '');
 
   const session = {
