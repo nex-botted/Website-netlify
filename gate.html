@@ -20,8 +20,6 @@ body{
   overflow:hidden;
   cursor:none;
 }
-
-/* BG GRID */
 .bg-grid{
   position:fixed;inset:0;
   background-image:
@@ -40,8 +38,6 @@ body{
   top:50%;left:50%;transform:translate(-50%,-55%);
   pointer-events:none;z-index:0;
 }
-
-/* CURSOR */
 #cur{position:fixed;width:22px;height:22px;pointer-events:none;z-index:9999;transform:translate(-50%,-50%)}
 #cur::before,#cur::after{content:'';position:absolute;background:rgba(255,255,255,0.7);border-radius:1px}
 #cur::before{width:1px;height:100%;left:50%;top:0;transform:translateX(-50%)}
@@ -53,8 +49,6 @@ body{
   transform:translate(-50%,-50%);
   transition:width .2s,height .2s;
 }
-
-/* MAIN CARD */
 .card{
   position:relative;z-index:2;
   width:min(500px,calc(100vw - 40px));
@@ -67,15 +61,11 @@ body{
   animation:cardIn .5s cubic-bezier(.22,1,.36,1) both;
 }
 @keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
-
-/* LOGO */
 .logo{
   height:48px;width:auto;
   filter:brightness(0) invert(1);
   margin-bottom:32px;
 }
-
-/* STEP INDICATOR */
 .steps{
   display:flex;align-items:center;justify-content:center;
   gap:0;margin-bottom:36px;
@@ -124,8 +114,6 @@ body{
   animation:fillLine .5s ease both;
 }
 @keyframes fillLine{from{transform:scaleX(0);transform-origin:left}to{transform:scaleX(1)}}
-
-/* COUNTDOWN RING */
 .countdown-wrap{
   display:flex;align-items:center;justify-content:center;
   margin:0 auto 28px;width:100px;height:100px;
@@ -145,13 +133,9 @@ body{
   line-height:1;color:#fff;
   font-family:'Sora',sans-serif;
 }
-
-/* STATUS STATES */
 .state{display:none}
 .state.active{display:block;animation:fadeIn .35s ease both}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-
-/* SPINNER */
 .spinner{
   width:44px;height:44px;border-radius:50%;
   border:2px solid rgba(255,255,255,0.08);
@@ -160,7 +144,6 @@ body{
   margin:0 auto 24px;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
-
 .state-title{
   font-size:18px;font-weight:700;margin-bottom:8px;letter-spacing:-.02em;
 }
@@ -170,8 +153,6 @@ body{
 .countdown-label{
   font-size:13px;color:rgba(255,255,255,0.4);margin-top:-6px;margin-bottom:0;
 }
-
-/* ERROR STATE */
 .err-icon{font-size:40px;margin-bottom:16px}
 .err-title{font-size:18px;font-weight:700;margin-bottom:8px;color:#fff}
 .err-msg{
@@ -188,8 +169,6 @@ body{
   transition:background .2s,transform .2s;text-decoration:none;
 }
 .retry-btn:hover{background:#e8e8e8;transform:translateY(-1px)}
-
-/* FOOTER TAG */
 .card-footer{
   margin-top:28px;padding-top:20px;
   border-top:1px solid rgba(255,255,255,0.06);
@@ -205,15 +184,11 @@ body{
 }
 .sdot{width:5px;height:5px;border-radius:50%;background:#fff;animation:blink 2s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-
-/* BYPASS WARNING */
-.bypass-warn{
-  background:rgba(255,255,255,0.03);
-  border:1px solid rgba(255,255,255,0.08);
-  border-radius:12px;padding:14px 18px;margin-bottom:18px;
-  font-size:12px;color:rgba(255,255,255,0.4);
-  font-family:'JetBrains Mono',monospace;line-height:1.6;
+/* Overlay to block all interaction while processing */
+#lock-overlay{
+  display:none;position:fixed;inset:0;z-index:8000;cursor:not-allowed;
 }
+#lock-overlay.active{display:block;}
 </style>
 </head>
 <body>
@@ -223,12 +198,12 @@ body{
 <div class="glow"></div>
 <div id="cur"></div>
 <div id="cur-ring"></div>
+<div id="lock-overlay"></div>
 
 <div class="card" id="card">
 
   <img src="https://i.ibb.co/bgTn718C/1122.png" alt="Incognito" class="logo" id="logo">
 
-  <!-- Step Indicator -->
   <div class="steps" id="steps-row">
     <div class="step-item">
       <div class="step-circle" id="s1">1</div>
@@ -246,14 +221,12 @@ body{
     </div>
   </div>
 
-  <!-- STATE: Verifying (loading) -->
   <div class="state" id="state-loading">
     <div class="spinner"></div>
     <div class="state-title">Verifying...</div>
     <div class="state-sub">Checking your progress with our servers.</div>
   </div>
 
-  <!-- STATE: Countdown + redirect -->
   <div class="state" id="state-countdown">
     <div class="countdown-wrap">
       <svg class="countdown-svg" viewBox="0 0 100 100">
@@ -266,7 +239,6 @@ body{
     <div class="state-sub countdown-label" id="cd-sub">Redirecting you to the next step</div>
   </div>
 
-  <!-- STATE: Error -->
   <div class="state" id="state-error">
     <div class="err-icon">⚠</div>
     <div class="err-title" id="err-title">Something went wrong</div>
@@ -281,251 +253,412 @@ body{
 </div>
 
 <script>
-// ── CONFIG ────────────────────────────────────────────────────────────────────
-const LV_LINKS = {
-  1: 'https://link-hub.net/5418777/Hp6R8sD9NW4S',
-  2: 'https://link-target.net/5418777/7LM5gMCFdkGP',
-  3: 'https://direct-link.net/5418777/YgEOqFalsihT',
-};
-const COUNTDOWN_SECS = 3;
+(function () {
+  'use strict';
 
-// ── CURSOR ────────────────────────────────────────────────────────────────────
-const cur  = document.getElementById('cur');
-const ring = document.getElementById('cur-ring');
-let mx=0, my=0, rx=0, ry=0;
-document.addEventListener('mousemove', e => {
-  mx = e.clientX; my = e.clientY;
-  cur.style.left  = mx + 'px';
-  cur.style.top   = my + 'px';
-});
-(function loop(){ rx+=(mx-rx)*.1; ry+=(my-ry)*.1; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(loop); })();
+  // ── CONSTANTS ────────────────────────────────────────────────────────────────
+  var COUNTDOWN_SECS   = 3;
+  var FETCH_TIMEOUT_MS = 10000;
+  var SID_PATTERN      = /^[A-Za-z0-9_\-]{8,128}$/;
+  var VALID_STEPS      = ['1', '2', '3', 'done'];
+  var STEP_COOKIE_KEY  = 'incognito_sid';
+  var NONCE_COOKIE_KEY = 'incognito_nc';
+  var TS_COOKIE_KEY    = 'incognito_ts';
 
-// ── UTILS ─────────────────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
+  // Minimum ms that must elapse between step initiations (anti-spam).
+  // Backend must also enforce this; this is a supplemental client-side brake.
+  var MIN_STEP_INTERVAL_MS = 1500;
 
-function showState(name) {
-  ['loading','countdown','error'].forEach(s => {
-    const el = $('state-'+s);
-    el.classList.toggle('active', s === name);
-  });
-}
+  // ── GLOBAL LOCK ──────────────────────────────────────────────────────────────
+  // Prevents ANY re-entry: duplicate calls, rapid navigation, race conditions.
+  var _locked = false;
 
-function setStepUI(step) {
-  // step = 1, 2, or 3 = the step currently being completed
-  const circles = [$('s1'),$('s2'),$('s3')];
-  const labels  = [$('sl1'),$('sl2'),$('sl3')];
-  const lines   = [$('line1'),$('line2')];
-
-  circles.forEach((c, i) => {
-    const idx = i + 1;
-    c.className = 'step-circle';
-    labels[i].className = 'step-label';
-    if (idx < step)  { c.classList.add('done');   labels[i].classList.add('done'); }
-    if (idx === step){ c.classList.add('active'); labels[i].classList.add('active'); }
-  });
-  lines.forEach((l, i) => {
-    l.className = 'step-line';
-    if (i + 1 < step) l.classList.add('filled');
-  });
-}
-
-function showError(title, msg, showHome = true) {
-  showState('error');
-  $('err-title').textContent = title;
-  $('err-msg').textContent   = msg;
-  const btn = $('retry-btn');
-  if (showHome) { btn.href = '/'; btn.textContent = '← Back to Home'; }
-  else          { btn.href = '/gate?step=1&regen=1'; btn.textContent = 'Try Again'; }
-}
-
-// ── COUNTDOWN ─────────────────────────────────────────────────────────────────
-const circumference = 2 * Math.PI * 45; // ≈ 282.74
-function startCountdown(title, subtitle, onDone) {
-  $('cd-title').textContent = title;
-  $('cd-sub').textContent   = subtitle;
-  showState('countdown');
-
-  const arc   = $('arc');
-  const cnum  = $('cnum');
-  const total = COUNTDOWN_SECS * 1000;
-  const start = Date.now();
-
-  arc.style.strokeDasharray  = circumference;
-  arc.style.strokeDashoffset = 0;
-
-  function tick() {
-    const elapsed  = Date.now() - start;
-    const frac     = Math.min(elapsed / total, 1);
-    const remaining = Math.ceil(COUNTDOWN_SECS - frac * COUNTDOWN_SECS);
-    cnum.textContent = remaining;
-    arc.style.strokeDashoffset = circumference * frac;
-
-    if (frac < 1) requestAnimationFrame(tick);
-    else onDone();
-  }
-  requestAnimationFrame(tick);
-}
-
-// ── COOKIE HELPERS ────────────────────────────────────────────────────────────
-function setCookie(name, val, mins) {
-  const d = new Date(Date.now() + mins * 60000);
-  document.cookie = `${name}=${val};expires=${d.toUTCString()};path=/;SameSite=Lax`;
-}
-function getCookie(name) {
-  const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-  return m ? m.pop() : null;
-}
-
-// ── GATE ACTION API ───────────────────────────────────────────────────────────
-async function gateAction(sid, step) {
-  const res = await fetch('/api/gate-action', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sid, step }),
-  });
-  return res.json();
-}
-// ── MAIN FLOW ─────────────────────────────────────────────────────────────────
-async function run() {
-  const params = new URLSearchParams(location.search);
-  const step   = params.get('step');
-  const sid    = params.get('sid') || getCookie('incognito_sid');
-
-  // ── No session ID at all → error ──────────────────────────────────────
-  if (!sid && step !== '1') {
-    showError('Session Not Found',
-      'Your session could not be found. Please restart the key generation process from the executor.',
-      true);
-    return;
+  function acquireLock() {
+    if (_locked) return false;
+    _locked = true;
+    document.getElementById('lock-overlay').classList.add('active');
+    return true;
   }
 
-  // ── STEP 1 — First gate page loaded from executor ─────────────────────
-  if (step === '1') {
-    if (!sid) {
-      showError('Invalid Link', 'This gate page requires a valid session ID. Please start from the executor.', true);
-      return;
-    }
+  // Once locked for a step, we never release within this page load —
+  // the page either redirects or shows an error (terminal state).
 
-    setStepUI(1);
-    showState('loading');
+  // ── DOM HELPERS ──────────────────────────────────────────────────────────────
+  function $(id) { return document.getElementById(id); }
 
-    // Persist session ID in cookie (survives Linkvertise redirect)
-    setCookie('incognito_sid', sid, 35);
-
-    // Tell server we started step 1
-    let res;
-    try { res = await gateAction(sid, 'start_1'); }
-    catch { showError('Network Error', 'Could not reach the server. Check your connection.', false); return; }
-
-    if (!res.ok) {
-      showError(
-        res.error?.includes('expired') ? 'Session Expired' : 'Invalid Session',
-        res.error || 'Session is invalid. Please restart from the executor.',
-        true
-      );
-      return;
-    }
-
-    // Countdown → redirect to LV1
-    startCountdown('Opening Link 1', 'Complete all steps on the next page to continue.', () => {
-      location.href = LV_LINKS[1];
+  function showState(name) {
+    ['loading', 'countdown', 'error'].forEach(function (s) {
+      $('state-' + s).classList.toggle('active', s === name);
     });
-    return;
   }
 
-  // ── STEP 2 — Returned from LV1 ────────────────────────────────────────
-  if (step === '2') {
-    setStepUI(2);
-    showState('loading');
+  // ── SAFE ERROR DISPLAY ───────────────────────────────────────────────────────
+  // Accepts only safe, generic messages — never echoes raw server/API output.
+  function showError(title, code) {
+    var safeMessages = {
+      'session_missing':    'Start the flow from your executor.',
+      'session_invalid':    'Your session ID is invalid. Please restart.',
+      'step_invalid':       'This link is not valid. Please restart.',
+      'step_order':         'Steps must be completed in order.',
+      'rate_limited':       'Please wait before trying again.',
+      'server_error':       'Server error. Please try again shortly.',
+      'network_error':      'Network error. Check your connection.',
+      'timeout':            'Request timed out. Check your connection.',
+      'unexpected':         'An unexpected error occurred. Please restart.',
+      'bad_response':       'Received an invalid response from the server.',
+      'completion_invalid': 'Could not verify step completion.',
+    };
 
-    let res;
-    try { res = await gateAction(sid, 'complete_1'); }
-    catch { showError('Network Error', 'Could not reach the server.', false); return; }
+    showState('error');
+    $('err-title').textContent = String(title).substring(0, 64);
+    $('err-msg').textContent   = safeMessages[code] || safeMessages['unexpected'];
+  }
 
-    if (!res.ok) {
-      if (res.waitMs) {
-        showError(
-          'Completed Too Fast',
-          `Bypass attempt detected. Please wait ${Math.ceil(res.waitMs / 1000)} more seconds and try again.`,
-          false
-        );
-      } else {
-        showError('Step Validation Failed', res.error || 'Could not validate step completion.', false);
+  // ── COOKIE HELPERS ───────────────────────────────────────────────────────────
+  function setCookie(name, value, minutes) {
+    var expires = new Date(Date.now() + minutes * 60000).toUTCString();
+    // SameSite=Strict prevents CSRF; Secure would be ideal but depends on host.
+    document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value)
+      + ';expires=' + expires + ';path=/;SameSite=Strict';
+  }
+
+  function getCookie(name) {
+    var key  = encodeURIComponent(name);
+    var match = document.cookie.match('(^|;)\\s*' + key + '\\s*=\\s*([^;]+)');
+    if (!match) return null;
+    try { return decodeURIComponent(match[2]); } catch (e) { return null; }
+  }
+
+  function deleteCookie(name) {
+    document.cookie = encodeURIComponent(name)
+      + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Strict';
+  }
+
+  // ── NONCE (one-use replay mitigation) ────────────────────────────────────────
+  function generateNonce() {
+    var arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+  }
+
+  function rotateNonce() {
+    var nc = generateNonce();
+    setCookie(NONCE_COOKIE_KEY, nc, 30);
+    return nc;
+  }
+
+  // ── TIMESTAMP GUARD ──────────────────────────────────────────────────────────
+  // Prevents machine-speed step cycling. Records the time the last step started.
+  function recordStepTimestamp() {
+    setCookie(TS_COOKIE_KEY, String(Date.now()), 30);
+  }
+
+  function isStepTooFast() {
+    var raw = getCookie(TS_COOKIE_KEY);
+    if (!raw) return false;
+    var ts = parseInt(raw, 10);
+    if (isNaN(ts)) return false;
+    return (Date.now() - ts) < MIN_STEP_INTERVAL_MS;
+  }
+
+  // ── INPUT VALIDATION ─────────────────────────────────────────────────────────
+  function isValidSid(sid) {
+    return typeof sid === 'string' && SID_PATTERN.test(sid);
+  }
+
+  function isValidStep(step) {
+    return typeof step === 'string' && VALID_STEPS.indexOf(step) !== -1;
+  }
+
+  // ── FETCH WITH TIMEOUT ───────────────────────────────────────────────────────
+  function fetchWithTimeout(url, options, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () {
+        reject(new Error('TIMEOUT'));
+      }, timeoutMs);
+
+      fetch(url, options).then(function (res) {
+        clearTimeout(timer);
+        resolve(res);
+      }).catch(function (err) {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
+
+  // ── API CALL ─────────────────────────────────────────────────────────────────
+  // Returns { ok: bool, error: string } always — never throws.
+  async function gateAction(sid, step) {
+    var nonce = rotateNonce();
+    var body  = JSON.stringify({ sid: sid, step: step, nc: nonce, ts: Date.now() });
+    var res, data;
+
+    try {
+      res = await fetchWithTimeout('/api/gate-action', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    body,
+        // Credentials=same-origin ensures cookies are sent (for server-side
+        // SID validation) but not sent cross-origin.
+        credentials: 'same-origin',
+        // Prevent caching of sensitive API responses.
+        cache: 'no-store',
+      }, FETCH_TIMEOUT_MS);
+    } catch (err) {
+      if (err && err.message === 'TIMEOUT') {
+        return { ok: false, error: 'timeout' };
       }
-      return;
+      return { ok: false, error: 'network_error' };
     }
-
-    startCountdown('Link 1 Complete ✓', 'Opening Link 2 — complete all steps to continue.', () => {
-      location.href = LV_LINKS[2];
-    });
-    return;
-  }
-
-  // ── STEP 3 — Returned from LV2 ────────────────────────────────────────
-  if (step === '3') {
-    setStepUI(3);
-    showState('loading');
-
-    let res;
-    try { res = await gateAction(sid, 'complete_2'); }
-    catch { showError('Network Error', 'Could not reach the server.', false); return; }
 
     if (!res.ok) {
-      if (res.waitMs) {
-        showError(
-          'Completed Too Fast',
-          `Bypass attempt detected. Wait ${Math.ceil(res.waitMs / 1000)}s and try again.`,
-          false
-        );
-      } else {
-        showError('Step Validation Failed', res.error || 'Could not validate step 2.', false);
+      // Map HTTP status codes to safe error codes.
+      if (res.status === 429) return { ok: false, error: 'rate_limited' };
+      if (res.status >= 500) return { ok: false, error: 'server_error' };
+      // 400/401/403 — treat as step order violation (don't reveal detail).
+      return { ok: false, error: 'step_order' };
+    }
+
+    try {
+      data = await res.json();
+    } catch (e) {
+      return { ok: false, error: 'bad_response' };
+    }
+
+    if (typeof data !== 'object' || data === null) {
+      return { ok: false, error: 'bad_response' };
+    }
+
+    // Strip any data we don't need — only accept ok and a safe error code.
+    return {
+      ok:    data.ok === true,
+      error: typeof data.error === 'string' ? data.error : 'unexpected',
+    };
+  }
+
+  // ── STEP INDICATOR UPDATE ────────────────────────────────────────────────────
+  function updateStepUI(activeStep) {
+    // activeStep: 1, 2, 3, or 4 (done)
+    for (var i = 1; i <= 3; i++) {
+      var circle = $('s' + i);
+      var label  = $('sl' + i);
+      circle.classList.remove('done', 'active');
+      label.classList.remove('done', 'active');
+      if (i < activeStep) {
+        circle.classList.add('done');
+        label.classList.add('done');
+      } else if (i === activeStep) {
+        circle.classList.add('active');
+        label.classList.add('active');
       }
+    }
+    // Lines
+    for (var j = 1; j <= 2; j++) {
+      var line = $('line' + j);
+      line.classList.toggle('filled', j < activeStep);
+    }
+  }
+
+  // ── COUNTDOWN + REDIRECT ─────────────────────────────────────────────────────
+  // destination must be validated before calling this function.
+  function startCountdown(titleText, subText, destination) {
+    $('cd-title').textContent = String(titleText).substring(0, 80);
+    $('cd-sub').textContent   = String(subText).substring(0, 120);
+    showState('countdown');
+
+    var t        = COUNTDOWN_SECS;
+    var arc      = $('arc');
+    var circumf  = 283; // 2π × r(45)
+
+    $('cnum').textContent = t;
+    arc.style.strokeDashoffset = '0';
+
+    var interval = setInterval(function () {
+      t--;
+      var progress = (COUNTDOWN_SECS - t) / COUNTDOWN_SECS;
+      arc.style.strokeDashoffset = String(progress * circumf);
+      $('cnum').textContent = Math.max(t, 0);
+
+      if (t <= 0) {
+        clearInterval(interval);
+        // Hard redirect — no JS navigation that can be spoofed.
+        window.location.replace(destination);
+      }
+    }, 1000);
+  }
+
+  // ── SAFE URL BUILDER ─────────────────────────────────────────────────────────
+  // Only returns URLs that belong to known safe patterns.
+  var LV_LINKS = {
+    '1': 'https://link-hub.net/5418777/Hp6R8sD9NW4S',
+    '2': 'https://link-target.net/5418777/7LM5gMCFdkGP',
+    '3': 'https://direct-link.net/5418777/YgEOqFalsihT',
+  };
+
+  function keyPageUrl(sid) {
+    // Strictly validate before building the /key URL.
+    if (!isValidSid(sid)) return null;
+    return '/key?sid=' + encodeURIComponent(sid);
+  }
+
+  // ── MAIN FLOW ────────────────────────────────────────────────────────────────
+  async function run() {
+    // 1. Parse and strictly validate URL parameters.
+    var params = new URLSearchParams(window.location.search);
+    var step   = params.get('step');
+    var sidParam = params.get('sid');
+
+    // Immediately wipe the SID from the URL bar to reduce shoulder-surfing risk.
+    // This is cosmetic but reduces accidental sharing.
+    if (sidParam && window.history && window.history.replaceState) {
+      var cleanUrl = window.location.pathname + '?step=' + encodeURIComponent(step || '');
+      window.history.replaceState(null, '', cleanUrl);
+    }
+
+    // 2. Validate step parameter before anything else.
+    if (!isValidStep(step)) {
+      showError('Invalid Page', 'step_invalid');
       return;
     }
 
-    startCountdown('Link 2 Complete ✓', 'Last step — almost there!', () => {
-      location.href = LV_LINKS[3];
-    });
-    return;
-  }
+    // 3. Resolve SID — URL param takes precedence (entry point), else cookie.
+    var sid = isValidSid(sidParam) ? sidParam
+            : isValidSid(getCookie(STEP_COOKIE_KEY)) ? getCookie(STEP_COOKIE_KEY)
+            : null;
 
-  // ── STEP DONE — Returned from LV3, generate key ────────────────────────
-  if (step === 'done') {
-    // Highlight all 3 done
-    ['s1','s2','s3'].forEach(id => { $(id).className = 'step-circle done'; });
-    ['sl1','sl2','sl3'].forEach(id => { const l = $(id); l.className='step-label'; l.classList.add('done'); });
-    ['line1','line2'].forEach(id => $(id).classList.add('filled'));
-    showState('loading');
+    // 4. Acquire the lock. If already processing, do nothing.
+    if (!acquireLock()) return;
 
-    let res;
-    try { res = await gateAction(sid, 'complete_3'); }
-    catch { showError('Network Error', 'Could not reach the server.', false); return; }
+    // 5. Anti-spam timing guard.
+    if (isStepTooFast()) {
+      showError('Too Fast', 'rate_limited');
+      return;
+    }
+    recordStepTimestamp();
 
-    if (!res.ok) {
-      if (res.waitMs) {
-        showError('Completed Too Fast', `Wait ${Math.ceil(res.waitMs/1000)}s and retry.`, false);
-      } else {
-        showError('Failed to Generate Key', res.error || 'An error occurred.', false);
+    // ── STEP 1 ────────────────────────────────────────────────────────────────
+    if (step === '1') {
+      if (!isValidSid(sidParam)) {
+        showError('Invalid Link', 'session_invalid');
+        return;
       }
+
+      // Persist SID in cookie (30 min). Overwrite any prior cookie.
+      deleteCookie(STEP_COOKIE_KEY);
+      setCookie(STEP_COOKIE_KEY, sidParam, 30);
+      sid = sidParam;
+
+      updateStepUI(1);
+      showState('loading');
+
+      var r1 = await gateAction(sid, 1);
+      if (!r1.ok) {
+        showError('Step 1 Failed', r1.error);
+        return;
+      }
+
+      startCountdown('Opening Link 1', 'Complete it to continue', LV_LINKS['1']);
       return;
     }
 
-    // All done — store key in cookie temporarily and redirect to /key
-    if (res.key) {
-      setCookie('incognito_key', res.key, 2);
+    // ── STEPS 2, 3, done — require a valid SID from cookie ───────────────────
+    if (!isValidSid(sid)) {
+      showError('Session Missing', 'session_missing');
+      return;
     }
 
-    startCountdown('All Steps Complete ✓', 'Generating your key...', () => {
-      location.href = `/key?sid=${sid}`;
-    });
-    return;
+    // ── STEP 2 ────────────────────────────────────────────────────────────────
+    if (step === '2') {
+      updateStepUI(2);
+      showState('loading');
+
+      var r2 = await gateAction(sid, 2);
+      if (!r2.ok) {
+        showError('Step 2 Failed', r2.error);
+        return;
+      }
+
+      startCountdown('Opening Link 2', 'Keep going\u2026', LV_LINKS['2']);
+      return;
+    }
+
+    // ── STEP 3 ────────────────────────────────────────────────────────────────
+    if (step === '3') {
+      updateStepUI(3);
+      showState('loading');
+
+      var r3 = await gateAction(sid, 3);
+      if (!r3.ok) {
+        showError('Step 3 Failed', r3.error);
+        return;
+      }
+
+      startCountdown('Opening Link 3', 'Final step\u2026', LV_LINKS['3']);
+      return;
+    }
+
+    // ── DONE ──────────────────────────────────────────────────────────────────
+    // Must verify with backend that ALL prior steps are complete.
+    // Never allow reaching /key without a successful server confirmation.
+    if (step === 'done') {
+      updateStepUI(4);
+      showState('loading');
+
+      var rd = await gateAction(sid, 'done');
+      if (!rd.ok) {
+        showError('Completion Failed', rd.error || 'completion_invalid');
+        return;
+      }
+
+      var dest = keyPageUrl(sid);
+      if (!dest) {
+        showError('Session Error', 'session_invalid');
+        return;
+      }
+
+      // Clear SID cookie after confirmed completion so it cannot be replayed.
+      deleteCookie(STEP_COOKIE_KEY);
+      deleteCookie(NONCE_COOKIE_KEY);
+      deleteCookie(TS_COOKIE_KEY);
+
+      startCountdown('All Done', 'Generating your key\u2026', dest);
+      return;
+    }
+
+    // Should be unreachable because of isValidStep check above.
+    showError('Invalid Page', 'step_invalid');
   }
 
-  // ── Unknown step ──────────────────────────────────────────────────────
-  showError('Invalid Gate URL', 'This URL is not valid. Please restart from the executor.', true);
-}
+  // ── CUSTOM CURSOR ────────────────────────────────────────────────────────────
+  (function initCursor() {
+    var cur  = $('cur');
+    var ring = $('cur-ring');
+    var rx = 0, ry = 0, cx = 0, cy = 0;
 
-run();
+    document.addEventListener('mousemove', function (e) {
+      cx = e.clientX; cy = e.clientY;
+      cur.style.left = cx + 'px';
+      cur.style.top  = cy + 'px';
+    });
+
+    function animRing() {
+      rx += (cx - rx) * 0.12;
+      ry += (cy - ry) * 0.12;
+      ring.style.left = rx + 'px';
+      ring.style.top  = ry + 'px';
+      requestAnimationFrame(animRing);
+    }
+    animRing();
+  })();
+
+  // ── BOOT ─────────────────────────────────────────────────────────────────────
+  // Wrap run() so any unhandled exception is caught safely.
+  run().catch(function () {
+    showError('Unexpected Error', 'unexpected');
+  });
+
+})();
 </script>
 </body>
 </html>
