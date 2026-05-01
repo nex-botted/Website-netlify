@@ -1,3 +1,6 @@
+console.log("SITE_ID =", process.env.NETLIFY_SITE_ID);
+console.log("TOKEN =", process.env.NETLIFY_AUTH_TOKEN ? "exists" : "missing");
+
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
 const { hashHwid } = require('./shared/crypto');
