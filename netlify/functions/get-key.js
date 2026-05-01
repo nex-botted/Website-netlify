@@ -37,8 +37,8 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Key not ready yet' }, 403);
   }
 
-  if (!session.key || typeof session.keyExpiresAt !== 'number' || session.keyExpiresAt <= now) {
-    return json({ ok: false, error: 'Session expired' }, 410);
+  if (!session.key || !session.keyExpiresAt || session.keyExpiresAt < now) {
+    return json({ ok: false, error: 'key_expired' }, 410);
   }
 
   return json({ ok: true, key: session.key });

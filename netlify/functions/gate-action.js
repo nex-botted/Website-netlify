@@ -63,7 +63,7 @@ exports.handler = async (event) => {
     : {};
 
   if (step >= 4) {
-    return json({ ok: false, error: 'step_order' }, 409);
+    return json({ ok: false, error: 'already_completed' }, 409);
   }
 
   const expectedActionByStep = {

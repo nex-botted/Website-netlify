@@ -64,8 +64,8 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Key mismatch' }, 403);
   }
 
-  if (typeof session.keyExpiresAt !== 'number' || session.keyExpiresAt <= now) {
-    return json({ ok: false, error: 'Session expired' }, 410);
+  if (!session.key || !session.keyExpiresAt || session.keyExpiresAt < now) {
+    return json({ ok: false, error: 'key_expired' }, 410);
   }
 
   const payload = encryptPayload(
