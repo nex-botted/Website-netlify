@@ -1,15 +1,14 @@
 [functions]
   node_bundler = "esbuild"
 
-# Block direct source access attempts
+# Allow API routes to work
 [[redirects]]
-  from = "/netlify/functions/*.js"
-  to = "/403.html"
-  status = 403
-  force = true
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
 
+# (Optional) block direct access to function files
 [[redirects]]
-  from = "/netlify/functions/*.mjs"
+  from = "/.netlify/functions/*"
   to = "/403.html"
   status = 403
-  force = true
