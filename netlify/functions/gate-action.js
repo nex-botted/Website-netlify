@@ -15,42 +15,101 @@ exports.handler = async (event) => {
 
   let body;
   try {
-    body = event.body ? JSON.parse(event.body) : {};
+    body = JSON.parse(event.body || '{}');
   } catch {
-    return json({ ok: false, error: 'Invalid JSON body' }, 400);
+    return json({ ok: false, error: 'Invalid JSON' }, 400);
   }
 
-  const { sid, step } = body;
-  if (!sid || typeof step !== 'number') {
-    return json({ ok: false, error: 'Invalid parameters' }, 400);
+  const { sessionId, action } = body;
+
+  if (!sessionId || !action) {
+    return json({ ok: false, error: 'Missing params' }, 400);
   }
 
   const store = getStore({
     name: 'incognito-sessions',
     consistency: 'strong',
-    siteID: process.env.NETLIFY_SITE_ID,
-    token: process.env.NETLIFY_AUTH_TOKEN
   });
 
-  const session = await store.get(`session:${sid}`, { type: 'json' });
-  if (!session) return json({ ok: false, error: 'Invalid session' }, 404);
+  const key = `session:${sessionId}`;
+  let session = await store.get(key, { type: 'json' });
+
+  if (!session) {
+    return json({ ok: false, error: 'Invalid session' }, 404);
+  }
 
   const now = Date.now();
-  if (session.expiresAt < now) {
+
+  if (session.expiresAt && session.expiresAt < now) {
     return json({ ok: false, error: 'Session expired' }, 410);
   }
 
-  if (step !== session.step + 1) {
-    return json({ ok: false, error: 'Invalid step progression' }, 400);
+  // initialize
+  session.step = session.step || 0;
+  session.timestamps = session.timestamps || {};
+
+  // ---- ACTION HANDLING ----
+  if (action === 'start_1') {
+    session.step = 1;
+    session.timestamps.step1 = now;
   }
 
-  session.step = step;
-  session.stepTimestamps = session.stepTimestamps || {};
-  session.stepTimestamps[`step${step}`] = now;
+  else if (action === 'complete_1') {
+    if (session.step < 1) {
+      return json({ ok: false, error: 'Step 1 not started' });
+    }
 
-  await store.setJSON(`session:${sid}`, session);
+    const diff = now - session.timestamps.step1;
+    if (diff < 5000) {
+      return json({ ok: false, waitMs: 5000 - diff });
+    }
 
-  return json({ ok: true, step });
+    session.step = 2;
+    session.timestamps.step2 = now;
+  }
+
+  else if (action === 'complete_2') {
+    if (session.step < 2) {
+      return json({ ok: false, error: 'Step 2 not ready' });
+    }
+
+    const diff = now - session.timestamps.step2;
+    if (diff < 5000) {
+      return json({ ok: false, waitMs: 5000 - diff });
+    }
+
+    session.step = 3;
+    session.timestamps.step3 = now;
+  }
+
+  else if (action === 'complete_3') {
+    if (session.step < 3) {
+      return json({ ok: false, error: 'Step 3 not ready' });
+    }
+
+    const diff = now - session.timestamps.step3;
+    if (diff < 5000) {
+      return json({ ok: false, waitMs: 5000 - diff });
+    }
+
+    session.step = 4;
+
+    // generate key
+    const keyValue = Math.random().toString(36).slice(2, 12).toUpperCase();
+    session.key = keyValue;
+
+    await store.setJSON(key, session);
+
+    return json({ ok: true, key: keyValue });
+  }
+
+  else {
+    return json({ ok: false, error: 'Invalid action' });
+  }
+
+  await store.setJSON(key, session);
+
+  return json({ ok: true });
 };
 
 exports.config = { path: '/api/gate-action' };
