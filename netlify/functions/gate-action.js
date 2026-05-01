@@ -1,11 +1,20 @@
 const { getStore } = require('@netlify/blobs');
+const crypto = require('crypto');
+
+const ALLOWED_ACTIONS = new Set(['start_1', 'complete_1', 'complete_2', 'complete_3']);
+const STEP_DELAY_MS = 5000;
+const KEY_TTL_MS = 24 * 60 * 60 * 1000;
 
 function json(data, status = 200) {
   return {
     statusCode: status,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   };
+}
+
+function invalid() {
+  return json({ ok: false, error: 'Invalid session' }, 400);
 }
 
 exports.handler = async (event) => {
@@ -20,10 +29,14 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Invalid JSON' }, 400);
   }
 
-  const { sessionId, action } = body;
+  const { sessionId, action } = body || {};
 
-  if (!sessionId || !action) {
-    return json({ ok: false, error: 'Missing params' }, 400);
+  if (typeof sessionId !== 'string' || sessionId.length < 16) {
+    return invalid();
+  }
+
+  if (typeof action !== 'string' || !ALLOWED_ACTIONS.has(action)) {
+    return json({ ok: false, error: 'Invalid action' }, 400);
   }
 
   const store = getStore({
@@ -31,95 +44,76 @@ exports.handler = async (event) => {
     consistency: 'strong',
   });
 
-  const key = `session:${sessionId}`;
-  let session = await store.get(key, { type: 'json' });
+  const storeKey = `session:${sessionId}`;
+  const session = await store.get(storeKey, { type: 'json' });
 
-  if (!session) {
-    return json({ ok: false, error: 'Invalid session' }, 404);
+  if (!session || session.sessionId !== sessionId) {
+    return invalid();
   }
 
   const now = Date.now();
 
-  if (session.expiresAt && session.expiresAt < now) {
+  if (typeof session.expiresAt !== 'number' || session.expiresAt <= now) {
     return json({ ok: false, error: 'Session expired' }, 410);
   }
 
-  // initialize
-  session.step = session.step || 0;
-  session.timestamps = session.timestamps || {};
+  const step = Number.isInteger(session.step) ? session.step : 0;
+  const stepTimestamps = session.stepTimestamps && typeof session.stepTimestamps === 'object'
+    ? session.stepTimestamps
+    : {};
 
-  // ---- ACTION HANDLING ----
-  if (action === 'start_1') {
-    if (session.step !== 0) {
-      return json({ ok: false, error: 'step_order' });
-    }
-
-    session.step = 1;
-    session.timestamps.step1 = now;
+  if (step >= 4) {
+    return json({ ok: false, error: 'already_completed' }, 409);
   }
 
-  else if (action === 'complete_1') {
-    if (session.step !== 1) {
-      return json({ ok: false, error: 'step_order' });
-    }
+  const expectedActionByStep = {
+    0: 'start_1',
+    1: 'complete_1',
+    2: 'complete_2',
+    3: 'complete_3',
+  };
 
-    const diff = now - session.timestamps.step1;
-    if (diff < 5000) {
-      return json({ ok: false, error: 'rate_limited' });
-    }
-
-    session.step = 2;
-    session.timestamps.step2 = now;
+  if (action !== expectedActionByStep[step]) {
+    return json({ ok: false, error: 'step_order' }, 409);
   }
 
-  else if (action === 'complete_2') {
-    if (session.step !== 2) {
-      return json({ ok: false, error: 'step_order' });
+  if (step > 0) {
+    const prevStepKey = `step${step}`;
+    const prevTs = stepTimestamps[prevStepKey];
+
+    if (typeof prevTs !== 'number') {
+      return json({ ok: false, error: 'step_order' }, 409);
     }
 
-    const diff = now - session.timestamps.step2;
-    if (diff < 5000) {
-      return json({ ok: false, error: 'rate_limited' });
+    if (now - prevTs < STEP_DELAY_MS) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
     }
-
-    session.step = 3;
-    session.timestamps.step3 = now;
   }
 
-  else if (action === 'complete_3') {
-    if (session.step !== 3) {
-      return json({ ok: false, error: 'step_order' });
-    }
+  const nextStep = step + 1;
+  const nextTimestamps = {
+    ...stepTimestamps,
+    [`step${nextStep}`]: now,
+  };
 
-    const diff = now - session.timestamps.step3;
-    if (diff < 5000) {
-      return json({ ok: false, error: 'rate_limited' });
-    }
+  const nextSession = {
+    ...session,
+    step: nextStep,
+    stepTimestamps: nextTimestamps,
+  };
 
-    session.step = 4;
-
-const keyValue = require('crypto')
-  .randomBytes(6)
-  .toString('hex')
-  .toUpperCase();
-
-session.key = keyValue;
-
-// ✅ ADD THIS
-session.keyExpiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
-
-    await store.setJSON(key, session);
-
-    return json({ ok: true, key: keyValue });
+  if (nextStep === 4) {
+    nextSession.key = crypto.randomBytes(32).toString('hex').toUpperCase();
+    nextSession.keyExpiresAt = now + KEY_TTL_MS;
   }
 
-else {
-  return json({ ok: false, error: 'Invalid action' });
-}
+  await store.setJSON(storeKey, nextSession);
 
-await store.setJSON(key, session);
+  if (nextStep === 4) {
+    return json({ ok: true, key: nextSession.key });
+  }
 
-return json({ ok: true });
+  return json({ ok: true });
 };
 
 exports.config = { path: '/api/gate-action' };
