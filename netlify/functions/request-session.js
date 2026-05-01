@@ -14,12 +14,6 @@ function json(data, status = 200) {
 }
 
 exports.handler = async (event, context) => {
-  // 🔥 DEBUG LOGS (will show in Netlify logs)
-  console.log("=== REQUEST SESSION HIT ===");
-  console.log("Method:", event.httpMethod);
-  console.log("SITE_ID:", process.env.NETLIFY_SITE_ID || "MISSING");
-  console.log("TOKEN:", process.env.NETLIFY_AUTH_TOKEN ? "EXISTS" : "MISSING");
-
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
   }
@@ -43,15 +37,12 @@ exports.handler = async (event, context) => {
   let hwidHash;
   try {
     hwidHash = hashHwid(hwid);
-  } catch (err) {
-    console.log("HASH ERROR:", err.message);
-    return json({ ok: false, error: 'Server configuration error.' }, 500);
+  } catch {
+    return json({ ok: false, error: 'Server error' }, 500);
   }
 
-  // ❗ Hard fail if env missing (so you SEE it clearly)
   if (!process.env.NETLIFY_SITE_ID || !process.env.NETLIFY_AUTH_TOKEN) {
-    console.log("❌ ENV VARS MISSING");
-    return json({ ok: false, error: 'Missing Netlify Blobs config' }, 500);
+    return json({ ok: false, error: 'Server error' }, 500);
   }
 
   const store = getStore({

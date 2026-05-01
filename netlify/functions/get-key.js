@@ -1,5 +1,4 @@
 const { getStore } = require('@netlify/blobs');
-const { generateKey } = require('./shared/crypto');
 
 function json(data, status = 200) {
   return {
@@ -15,8 +14,8 @@ exports.handler = async (event) => {
   }
 
   const sessionId = event.queryStringParameters?.sid;
-  if (!sessionId) {
-    return json({ ok: false, error: 'Missing session ID' }, 400);
+  if (typeof sessionId !== 'string' || !/^[a-f0-9]{32}$/i.test(sessionId)) {
+    return json({ ok: false, error: 'Invalid session' }, 400);
   }
 
   const store = getStore({
@@ -38,9 +37,8 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Key not ready yet' }, 403);
   }
 
-  if (!session.key) {
-    session.key = generateKey(session.sessionId);
-    await store.setJSON(`session:${sessionId}`, session);
+  if (!session.key || !session.keyExpiresAt || session.keyExpiresAt < now) {
+    return json({ ok: false, error: 'key_expired' }, 410);
   }
 
   return json({ ok: true, key: session.key });
