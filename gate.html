@@ -377,15 +377,14 @@ function getCookie(name) {
 }
 
 // ── GATE ACTION API ───────────────────────────────────────────────────────────
-async function gateAction(sessionId, action) {
+async function gateAction(sid, step) {
   const res = await fetch('/api/gate-action', {
-    method:  'POST',
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ sessionId, action }),
+    body: JSON.stringify({ sid, step }),
   });
   return res.json();
 }
-
 // ── MAIN FLOW ─────────────────────────────────────────────────────────────────
 async function run() {
   const params = new URLSearchParams(location.search);
