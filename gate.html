@@ -389,53 +389,70 @@ body{
 
   // ── API CALL ─────────────────────────────────────────────────────────────────
   // Returns { ok: bool, error: string } always — never throws.
-  async function gateAction(sid, step) {
-    var nonce = rotateNonce();
-    var body  = JSON.stringify({ sid: sid, step: step, nc: nonce, ts: Date.now() });
-    var res, data;
+// ── API CALL ─────────────────────────────────────────────────────────────────
+// Returns { ok: bool, error: string } always — never throws.
+async function gateAction(sid, step) {
 
-    try {
-      res = await fetchWithTimeout('/.netlify/functions/gate-action', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    body,
-        // Credentials=same-origin ensures cookies are sent (for server-side
-        // SID validation) but not sent cross-origin.
-        credentials: 'same-origin',
-        // Prevent caching of sensitive API responses.
-        cache: 'no-store',
-      }, FETCH_TIMEOUT_MS);
-    } catch (err) {
-      if (err && err.message === 'TIMEOUT') {
-        return { ok: false, error: 'timeout' };
-      }
-      return { ok: false, error: 'network_error' };
-    }
-
-    if (!res.ok) {
-      // Map HTTP status codes to safe error codes.
-      if (res.status === 429) return { ok: false, error: 'rate_limited' };
-      if (res.status >= 500) return { ok: false, error: 'server_error' };
-      // 400/401/403 — treat as step order violation (don't reveal detail).
-      return { ok: false, error: 'step_order' };
-    }
-
-    try {
-      data = await res.json();
-    } catch (e) {
-      return { ok: false, error: 'bad_response' };
-    }
-
-    if (typeof data !== 'object' || data === null) {
-      return { ok: false, error: 'bad_response' };
-    }
-
-    // Strip any data we don't need — only accept ok and a safe error code.
-    return {
-      ok:    data.ok === true,
-      error: typeof data.error === 'string' ? data.error : 'unexpected',
-    };
+  function mapStepToAction(step) {
+    if (step === '1') return 'start_1';
+    if (step === '2') return 'complete_1';
+    if (step === '3') return 'complete_2';
+    if (step === 'done') return 'complete_3';
+    return null;
   }
+
+  var action = mapStepToAction(step);
+
+  if (!action) {
+    return { ok: false, error: 'step_invalid' };
+  }
+
+var nonce = rotateNonce();
+
+var body = JSON.stringify({
+  sessionId: sid,
+  action: action,
+  nonce: nonce
+});
+
+  var res, data;
+
+  try {
+    res = await fetchWithTimeout('/api/gate-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body,
+      credentials: 'same-origin',
+      cache: 'no-store',
+    }, FETCH_TIMEOUT_MS);
+  } catch (err) {
+    if (err && err.message === 'TIMEOUT') {
+      return { ok: false, error: 'timeout' };
+    }
+    return { ok: false, error: 'network_error' };
+  }
+
+  if (!res.ok) {
+    if (res.status === 429) return { ok: false, error: 'rate_limited' };
+    if (res.status >= 500) return { ok: false, error: 'server_error' };
+    return { ok: false, error: 'step_order' };
+  }
+
+  try {
+    data = await res.json();
+  } catch (e) {
+    return { ok: false, error: 'bad_response' };
+  }
+
+  if (typeof data !== 'object' || data === null) {
+    return { ok: false, error: 'bad_response' };
+  }
+
+  return {
+    ok: data.ok === true,
+    error: typeof data.error === 'string' ? data.error : 'unexpected',
+  };
+}
 
   // ── STEP INDICATOR UPDATE ────────────────────────────────────────────────────
   function updateStepUI(activeStep) {
