@@ -50,18 +50,22 @@ exports.handler = async (event) => {
 
   // ---- ACTION HANDLING ----
   if (action === 'start_1') {
+    if (session.step !== 0) {
+      return json({ ok: false, error: 'step_order' });
+    }
+
     session.step = 1;
     session.timestamps.step1 = now;
   }
 
   else if (action === 'complete_1') {
-    if (session.step < 1) {
-      return json({ ok: false, error: 'Step 1 not started' });
+    if (session.step !== 1) {
+      return json({ ok: false, error: 'step_order' });
     }
 
     const diff = now - session.timestamps.step1;
     if (diff < 5000) {
-      return json({ ok: false, waitMs: 5000 - diff });
+      return json({ ok: false, error: 'rate_limited' });
     }
 
     session.step = 2;
@@ -69,13 +73,13 @@ exports.handler = async (event) => {
   }
 
   else if (action === 'complete_2') {
-    if (session.step < 2) {
-      return json({ ok: false, error: 'Step 2 not ready' });
+    if (session.step !== 2) {
+      return json({ ok: false, error: 'step_order' });
     }
 
     const diff = now - session.timestamps.step2;
     if (diff < 5000) {
-      return json({ ok: false, waitMs: 5000 - diff });
+      return json({ ok: false, error: 'rate_limited' });
     }
 
     session.step = 3;
@@ -83,18 +87,17 @@ exports.handler = async (event) => {
   }
 
   else if (action === 'complete_3') {
-    if (session.step < 3) {
-      return json({ ok: false, error: 'Step 3 not ready' });
+    if (session.step !== 3) {
+      return json({ ok: false, error: 'step_order' });
     }
 
     const diff = now - session.timestamps.step3;
     if (diff < 5000) {
-      return json({ ok: false, waitMs: 5000 - diff });
+      return json({ ok: false, error: 'rate_limited' });
     }
 
     session.step = 4;
 
-    // generate key
     const keyValue = Math.random().toString(36).slice(2, 12).toUpperCase();
     session.key = keyValue;
 
