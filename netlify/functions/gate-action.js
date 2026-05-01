@@ -8,7 +8,11 @@ const KEY_TTL_MS = 24 * 60 * 60 * 1000;
 function json(data, status = 200) {
   return {
     statusCode: status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    },
     body: JSON.stringify(data),
   };
 }
@@ -109,9 +113,7 @@ exports.handler = async (event) => {
 
   await store.setJSON(storeKey, nextSession);
 
-  if (nextStep === 4) {
-    return json({ ok: true, key: nextSession.key });
-  }
+  if (nextStep === 4) return json({ ok: true });
 
   return json({ ok: true });
 };
