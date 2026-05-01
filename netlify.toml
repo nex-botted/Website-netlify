@@ -12,11 +12,19 @@
   from = "/.netlify/functions/*"
   to = "/403.html"
   status = 403
+  force = true
+
+[[redirects]]
+  from = "/netlify/functions/*"
+  to = "/403.html"
+  status = 403
+  force = true
 
 [[redirects]]
   from = "/netlify/*"
   to = "/403.html"
   status = 403
+  force = true
 
 [[headers]]
   for = "/*"
