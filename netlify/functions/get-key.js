@@ -3,7 +3,11 @@ const { getStore } = require('@netlify/blobs');
 function json(data, status = 200) {
   return {
     statusCode: status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    },
     body: JSON.stringify(data)
   };
 }
