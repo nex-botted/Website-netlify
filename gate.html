@@ -262,6 +262,7 @@ body{
   var SID_PATTERN      = /^[A-Za-z0-9_\-]{8,128}$/;
   var VALID_STEPS      = ['1', '2', '3', 'done'];
   var STEP_COOKIE_KEY  = 'incognito_sid';
+  var TOKEN_COOKIE_KEY = 'incognito_st';
   var NONCE_COOKIE_KEY = 'incognito_nc';
   var TS_COOKIE_KEY    = 'incognito_ts';
 
@@ -391,7 +392,7 @@ body{
   // Returns { ok: bool, error: string } always — never throws.
 // ── API CALL ─────────────────────────────────────────────────────────────────
 // Returns { ok: bool, error: string } always — never throws.
-async function gateAction(sid, step) {
+async function gateAction(sid, st, step) {
 
   function mapStepToAction(step) {
     if (step === '1') return 'start_1';
@@ -412,13 +413,14 @@ var nonce = rotateNonce();
 var body = JSON.stringify({
   sessionId: sid,
   action: action,
+  st: st,
   nonce: nonce
 });
 
   var res, data;
 
   try {
-    res = await fetchWithTimeout('/.netlify/functions/gate-action', {
+    res = await fetchWithTimeout('/api/gate-action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: body,
@@ -513,10 +515,10 @@ var body = JSON.stringify({
     '3': 'https://direct-link.net/5418777/YgEOqFalsihT',
   };
 
-  function keyPageUrl(sid) {
+  function keyPageUrl(sid, st) {
     // Strictly validate before building the /key URL.
     if (!isValidSid(sid)) return null;
-    return '/key?sid=' + encodeURIComponent(sid);
+    return '/key?sid=' + encodeURIComponent(sid) + '&st=' + encodeURIComponent(st || '');
   }
 
   // ── MAIN FLOW ────────────────────────────────────────────────────────────────
@@ -525,6 +527,7 @@ var body = JSON.stringify({
     var params = new URLSearchParams(window.location.search);
     var step   = params.get('step');
     var sidParam = params.get('sid');
+    var stParam = params.get('st');
 
     // Immediately wipe the SID from the URL bar to reduce shoulder-surfing risk.
     // This is cosmetic but reduces accidental sharing.
@@ -543,6 +546,7 @@ var body = JSON.stringify({
     var sid = isValidSid(sidParam) ? sidParam
             : isValidSid(getCookie(STEP_COOKIE_KEY)) ? getCookie(STEP_COOKIE_KEY)
             : null;
+    var st = (typeof stParam === 'string' && stParam.length > 20) ? stParam : getCookie(TOKEN_COOKIE_KEY);
 
     // 4. Acquire the lock. If already processing, do nothing.
     if (!acquireLock()) return;
@@ -564,12 +568,14 @@ var body = JSON.stringify({
       // Persist SID in cookie (30 min). Overwrite any prior cookie.
       deleteCookie(STEP_COOKIE_KEY);
       setCookie(STEP_COOKIE_KEY, sidParam, 30);
+      if (stParam) setCookie(TOKEN_COOKIE_KEY, stParam, 30);
       sid = sidParam;
+      st = stParam || st;
 
       updateStepUI(1);
       showState('loading');
 
-      var r1 = await gateAction(sid, 1);
+      var r1 = await gateAction(sid, st, 1);
       if (!r1.ok) {
         showError('Step 1 Failed', r1.error);
         return;
@@ -590,7 +596,7 @@ var body = JSON.stringify({
       updateStepUI(2);
       showState('loading');
 
-      var r2 = await gateAction(sid, 2);
+      var r2 = await gateAction(sid, st, 2);
       if (!r2.ok) {
         showError('Step 2 Failed', r2.error);
         return;
@@ -605,7 +611,7 @@ var body = JSON.stringify({
       updateStepUI(3);
       showState('loading');
 
-      var r3 = await gateAction(sid, 3);
+      var r3 = await gateAction(sid, st, 3);
       if (!r3.ok) {
         showError('Step 3 Failed', r3.error);
         return;
@@ -622,13 +628,13 @@ var body = JSON.stringify({
       updateStepUI(4);
       showState('loading');
 
-      var rd = await gateAction(sid, 'done');
+      var rd = await gateAction(sid, st, 'done');
       if (!rd.ok) {
         showError('Completion Failed', rd.error || 'completion_invalid');
         return;
       }
 
-      var dest = keyPageUrl(sid);
+      var dest = keyPageUrl(sid, st);
       if (!dest) {
         showError('Session Error', 'session_invalid');
         return;

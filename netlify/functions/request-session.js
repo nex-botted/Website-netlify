@@ -1,6 +1,6 @@
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
-const { hashHwid } = require('./shared/crypto');
+const { hashHwid, signToken } = require('./shared/crypto');
 
 const SESSION_TTL_MS  = 30 * 60 * 1000;
 const HWID_RATE_LIMIT = 3;
@@ -8,14 +8,34 @@ const HWID_RATE_LIMIT = 3;
 function json(data, status = 200) {
   return {
     statusCode: status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    },
     body: JSON.stringify(data)
   };
+}
+
+function hasTrustedOrigin(event) {
+  const origin = event.headers?.origin;
+  if (!origin) return true;
+  try {
+    const reqUrl = new URL(event.rawUrl);
+    const o = new URL(origin);
+    return reqUrl.host === o.host && reqUrl.protocol === o.protocol;
+  } catch {
+    return false;
+  }
 }
 
 exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
+  }
+
+  if (!hasTrustedOrigin(event)) {
+    return json({ ok: false, error: 'forbidden_origin' }, 403);
   }
 
   let body;
@@ -75,8 +95,8 @@ exports.handler = async (event, context) => {
 
   // ── IP rate limit ──
   const ip =
-    event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-    event.headers['client-ip'] ||
+    event.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
+    event.headers?.['client-ip'] ||
     '0.0.0.0';
 
   const ipKey = `rl:ip:${ip}`;
@@ -110,10 +130,13 @@ exports.handler = async (event, context) => {
   const reqUrl = new URL(event.rawUrl);
   const baseUrl = `${reqUrl.protocol}//${reqUrl.host}`;
 
+  const sessionToken = signToken({ sid: sessionId, exp: now + SESSION_TTL_MS });
+
   return json({
     ok: true,
     sessionId,
-    gateUrl: `${baseUrl}/gate?step=1&sid=${sessionId}`,
+    sessionToken,
+    gateUrl: `${baseUrl}/gate?step=1&sid=${sessionId}&st=${encodeURIComponent(sessionToken)}`,
     expiresIn: SESSION_TTL_MS / 1000,
   }, 201);
 };
