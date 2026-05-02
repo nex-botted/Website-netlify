@@ -4,17 +4,31 @@ const crypto = require('crypto');
 const ALLOWED_ACTIONS = new Set(['start_1', 'complete_1', 'complete_2', 'complete_3']);
 const STEP_DELAY_MS = 5000;
 const KEY_TTL_MS = 24 * 60 * 60 * 1000;
+const IP_WINDOW_MS = 5 * 60 * 1000;
+const IP_MAX_REQUESTS = 60;
 
 function json(data, status = 200) {
   return {
     statusCode: status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    },
     body: JSON.stringify(data),
   };
 }
 
 function invalid() {
   return json({ ok: false, error: 'Invalid session' }, 400);
+}
+
+function getClientIp(event) {
+  return (
+    event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    event.headers['client-ip'] ||
+    '0.0.0.0'
+  );
 }
 
 exports.handler = async (event) => {
@@ -52,9 +66,23 @@ exports.handler = async (event) => {
   }
 
   const now = Date.now();
+  const ip = getClientIp(event);
+
+  const ipRateKey = `rl:gate:ip:${ip}`;
+  const ipRateRaw = await store.get(ipRateKey, { type: 'json' });
+  const ipRecent = ((ipRateRaw?.timestamps) || []).filter(ts => ts > now - IP_WINDOW_MS);
+  if (ipRecent.length >= IP_MAX_REQUESTS) {
+    return json({ ok: false, error: 'rate_limited' }, 429);
+  }
+  ipRecent.push(now);
+  await store.setJSON(ipRateKey, { timestamps: ipRecent });
 
   if (typeof session.expiresAt !== 'number' || session.expiresAt <= now) {
     return json({ ok: false, error: 'Session expired' }, 410);
+  }
+
+  if (session.ip && session.ip !== ip) {
+    return json({ ok: false, error: 'ip_mismatch' }, 403);
   }
 
   const step = Number.isInteger(session.step) ? session.step : 0;
@@ -109,9 +137,7 @@ exports.handler = async (event) => {
 
   await store.setJSON(storeKey, nextSession);
 
-  if (nextStep === 4) {
-    return json({ ok: true, key: nextSession.key });
-  }
+  if (nextStep === 4) return json({ ok: true });
 
   return json({ ok: true });
 };
