@@ -318,9 +318,8 @@ body{
   // ── COOKIE HELPERS ───────────────────────────────────────────────────────────
   function setCookie(name, value, minutes) {
     var expires = new Date(Date.now() + minutes * 60000).toUTCString();
-    // SameSite=Strict prevents CSRF; Secure would be ideal but depends on host.
     document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value)
-      + ';expires=' + expires + ';path=/;SameSite=Strict';
+      + ';expires=' + expires + ';path=/;SameSite=Strict;Secure';
   }
 
   function getCookie(name) {
@@ -515,10 +514,9 @@ var body = JSON.stringify({
     '3': 'https://direct-link.net/5418777/YgEOqFalsihT',
   };
 
-  function keyPageUrl(sid, st) {
-    // Strictly validate before building the /key URL.
-    if (!isValidSid(sid)) return null;
-    return '/key?sid=' + encodeURIComponent(sid) + '&st=' + encodeURIComponent(st || '');
+  function keyPageUrl() {
+    // Keep session identifiers out of URL query params.
+    return '/key';
   }
 
   // ── MAIN FLOW ────────────────────────────────────────────────────────────────
@@ -634,7 +632,7 @@ var body = JSON.stringify({
         return;
       }
 
-      var dest = keyPageUrl(sid, st);
+      var dest = keyPageUrl();
       if (!dest) {
         showError('Session Error', 'session_invalid');
         return;

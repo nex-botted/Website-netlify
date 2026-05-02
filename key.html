@@ -268,9 +268,8 @@ async function fetchKey(sid, st) {
 }
 
 async function init() {
-  const params = new URLSearchParams(location.search);
-  const sid    = params.get('sid') || getCookie('incognito_sid');
-  const st     = params.get('st') || getCookie('incognito_st');
+  const sid    = getCookie('incognito_sid');
+  const st     = getCookie('incognito_st');
 
   if (!sid) {
     show('state-error');
@@ -286,14 +285,7 @@ async function init() {
     return;
   }
 
-  // Try cookie key first (set by gate.html for speed)
-  const cookieKey = getCookie('incognito_key');
-  if (cookieKey && cookieKey.startsWith('incognito_')) {
-    displayKey(cookieKey, null);
-    return;
-  }
-
-  // Otherwise fetch from API
+  // Always fetch from API; never trust a client-stored key value.
   let data;
   try { data = await fetchKey(sid, st); }
   catch {
