@@ -418,7 +418,7 @@ var body = JSON.stringify({
   var res, data;
 
   try {
-    res = await fetchWithTimeout('/.netlify/functions/gate-action', {
+    res = await fetchWithTimeout('/api/gate-action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: body,

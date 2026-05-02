@@ -18,6 +18,14 @@ function json(data, status = 200) {
   };
 }
 
+function getClientIp(event) {
+  return (
+    event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    event.headers['client-ip'] ||
+    '0.0.0.0'
+  );
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
@@ -60,8 +68,13 @@ exports.handler = async (event) => {
   if (!session) return json({ ok: false, error: 'Invalid session' }, 404);
 
   const now = Date.now();
+  const ip = getClientIp(event);
   if (session.expiresAt < now) {
     return json({ ok: false, error: 'Session expired' }, 410);
+  }
+
+  if (session.ip && session.ip !== ip) {
+    return json({ ok: false, error: 'ip_mismatch' }, 403);
   }
 
   const hwidHash = hashHwid(hwid);
