@@ -5,7 +5,6 @@
 
 const crypto = require('crypto');
 
-// ── Base58 ─────────────────────────────────────────────
 const B58_ALPHA = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function b58enc(buf) {
@@ -53,14 +52,12 @@ function b58decBuf(str) {
   }
 }
 
-// ── Env helpers ────────────────────────────────────────
 function getPepper() {
   const p = process.env.KEY_PEPPER;
   if (!p) throw new Error('KEY_PEPPER env var is not set');
   return p;
 }
 
-// ── Key generation ─────────────────────────────────────
 function deriveSignature(keyId, entropy) {
   const msg = Buffer.concat([
     Buffer.from('v1', 'utf8'),
@@ -113,7 +110,6 @@ function verifyKeySignature(rawKey) {
   }
 }
 
-// ── HWID hashing ───────────────────────────────────────
 function hashHwid(hwidHex) {
   return crypto
     .createHmac('sha256', getPepper())
@@ -121,31 +117,33 @@ function hashHwid(hwidHex) {
     .digest('hex');
 }
 
-// ── Token signing ──────────────────────────────────────
 function signToken(data) {
-  const payload = JSON.stringify(data);
-
-  const mac = crypto
-    .createHmac('sha256', getPepper())
-    .update(payload)
-    .digest('hex')
-    .slice(0, 16);
-
-  return Buffer.from(payload).toString('base64url') + '.' + mac;
+  const now = Date.now();
+  const payloadObj = {
+    ...data,
+    iat: data.iat || now,
+    nbf: data.nbf || now - 5000,
+    jti: data.jti || crypto.randomBytes(16).toString('hex')
+  };
+  const payload = JSON.stringify(payloadObj);
+  const iv = crypto.randomBytes(12);
+  const encKey = crypto
+    .createHash('sha256')
+    .update(String(process.env.TOKEN_ENC_KEY || getPepper()))
+    .digest();
+  const cipher = crypto.createCipheriv('aes-256-gcm', encKey, iv);
+  const ciphertext = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  const body = Buffer.concat([iv, tag, ciphertext]).toString('base64url');
+  const mac = crypto.createHmac('sha256', getPepper()).update(body).digest('hex').slice(0, 32);
+  return `${body}.${mac}`;
 }
 
 function verifyToken(token) {
   try {
-    const [b64, mac] = token.split('.');
-    if (!b64 || !mac) return null;
-
-    const payload = Buffer.from(b64, 'base64url').toString('utf8');
-
-    const expected = crypto
-      .createHmac('sha256', getPepper())
-      .update(payload)
-      .digest('hex')
-      .slice(0, 16);
+    const [body, mac] = token.split('.');
+    if (!body || !mac) return null;
+    const expected = crypto.createHmac('sha256', getPepper()).update(body).digest('hex').slice(0, 32);
 
     if (mac.length !== expected.length) return null;
 
@@ -157,14 +155,28 @@ function verifyToken(token) {
     ) {
       return null;
     }
-
-    return JSON.parse(payload);
+    const packed = Buffer.from(body, 'base64url');
+    if (packed.length < 29) return null;
+    const iv = packed.subarray(0, 12);
+    const tag = packed.subarray(12, 28);
+    const ciphertext = packed.subarray(28);
+    const encKey = crypto
+      .createHash('sha256')
+      .update(String(process.env.TOKEN_ENC_KEY || getPepper()))
+      .digest();
+    const decipher = crypto.createDecipheriv('aes-256-gcm', encKey, iv);
+    decipher.setAuthTag(tag);
+    const payload = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    const data = JSON.parse(payload);
+    const now = Date.now();
+    if (typeof data.nbf === 'number' && data.nbf > now + 5000) return null;
+    if (typeof data.exp === 'number' && data.exp < now) return null;
+    return data;
   } catch {
     return null;
   }
 }
 
-// ── AES encryption ─────────────────────────────────────
 function encryptPayload(obj, sessionSaltHex) {
   const masterKey = process.env.AES_MASTER_KEY;
   if (!masterKey) throw new Error('AES_MASTER_KEY not set');
@@ -197,7 +209,6 @@ function encryptPayload(obj, sessionSaltHex) {
   };
 }
 
-// ── EXPORTS ────────────────────────────────────────────
 module.exports = {
   b58enc,
   getPepper,
