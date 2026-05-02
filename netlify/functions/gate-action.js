@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const ALLOWED_ACTIONS = new Set(['start_1', 'complete_1', 'complete_2', 'complete_3']);
 const STEP_DELAY_MS = 5000;
 const KEY_TTL_MS = 24 * 60 * 60 * 1000;
+const IP_WINDOW_MS = 5 * 60 * 1000;
+const IP_MAX_REQUESTS = 60;
 
 function json(data, status = 200) {
   return {
@@ -65,6 +67,15 @@ exports.handler = async (event) => {
 
   const now = Date.now();
   const ip = getClientIp(event);
+
+  const ipRateKey = `rl:gate:ip:${ip}`;
+  const ipRateRaw = await store.get(ipRateKey, { type: 'json' });
+  const ipRecent = ((ipRateRaw?.timestamps) || []).filter(ts => ts > now - IP_WINDOW_MS);
+  if (ipRecent.length >= IP_MAX_REQUESTS) {
+    return json({ ok: false, error: 'rate_limited' }, 429);
+  }
+  ipRecent.push(now);
+  await store.setJSON(ipRateKey, { timestamps: ipRecent });
 
   if (typeof session.expiresAt !== 'number' || session.expiresAt <= now) {
     return json({ ok: false, error: 'Session expired' }, 410);

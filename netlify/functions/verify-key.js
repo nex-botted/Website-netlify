@@ -26,6 +26,9 @@ function getClientIp(event) {
   );
 }
 
+const IP_WINDOW_MS = 5 * 60 * 1000;
+const IP_MAX_REQUESTS = 30;
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
@@ -69,6 +72,14 @@ exports.handler = async (event) => {
 
   const now = Date.now();
   const ip = getClientIp(event);
+  const ipRateKey = `rl:verify:ip:${ip}`;
+  const ipRateRaw = await store.get(ipRateKey, { type: 'json' });
+  const ipRecent = ((ipRateRaw?.timestamps) || []).filter(ts => ts > now - IP_WINDOW_MS);
+  if (ipRecent.length >= IP_MAX_REQUESTS) {
+    return json({ ok: false, error: 'rate_limited' }, 429);
+  }
+  ipRecent.push(now);
+  await store.setJSON(ipRateKey, { timestamps: ipRecent });
   if (session.expiresAt < now) {
     return json({ ok: false, error: 'Session expired' }, 410);
   }
