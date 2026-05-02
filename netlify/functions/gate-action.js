@@ -25,15 +25,31 @@ function invalid() {
 
 function getClientIp(event) {
   return (
-    event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-    event.headers['client-ip'] ||
+    event.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
+    event.headers?.['client-ip'] ||
     '0.0.0.0'
   );
+}
+
+function hasTrustedOrigin(event) {
+  const origin = event.headers?.origin;
+  if (!origin) return true;
+  try {
+    const reqUrl = new URL(event.rawUrl);
+    const o = new URL(origin);
+    return reqUrl.host === o.host && reqUrl.protocol === o.protocol;
+  } catch {
+    return false;
+  }
 }
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
+  }
+
+  if (!hasTrustedOrigin(event)) {
+    return json({ ok: false, error: 'forbidden_origin' }, 403);
   }
 
   let body;
