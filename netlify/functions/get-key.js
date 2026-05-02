@@ -3,9 +3,21 @@ const { getStore } = require('@netlify/blobs');
 function json(data, status = 200) {
   return {
     statusCode: status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    },
     body: JSON.stringify(data)
   };
+}
+
+function getClientIp(event) {
+  return (
+    event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    event.headers['client-ip'] ||
+    '0.0.0.0'
+  );
 }
 
 exports.handler = async (event) => {
@@ -29,8 +41,13 @@ exports.handler = async (event) => {
   if (!session) return json({ ok: false, error: 'Invalid session' }, 404);
 
   const now = Date.now();
+  const ip = getClientIp(event);
   if (session.expiresAt < now) {
     return json({ ok: false, error: 'Session expired' }, 410);
+  }
+
+  if (session.ip && session.ip !== ip) {
+    return json({ ok: false, error: 'ip_mismatch' }, 403);
   }
 
   if (session.step < 4) {
