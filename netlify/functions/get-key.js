@@ -1,6 +1,6 @@
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
-const { verifyToken } = require('./shared/crypto');
+const { verifyToken, decryptAtRest } = require('./shared/crypto');
 
 function json(data, status = 200) {
   return {
@@ -81,7 +81,12 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'key_expired' }, 410);
   }
 
-  return json({ ok: true, key: session.key });
+  const decryptedKey = decryptAtRest(session.key);
+  if (!decryptedKey) {
+    return json({ ok: false, error: 'key_unavailable' }, 500);
+  }
+
+  return json({ ok: true, key: decryptedKey });
 };
 
 exports.config = { path: '/api/get-key' };

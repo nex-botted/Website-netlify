@@ -1,6 +1,6 @@
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
-const { verifyToken } = require('./shared/crypto');
+const { verifyToken, encryptAtRest } = require('./shared/crypto');
 
 const ALLOWED_ACTIONS = new Set(['start_1', 'complete_1', 'complete_2', 'complete_3']);
 const STEP_DELAY_MS = 5000;
@@ -157,7 +157,7 @@ exports.handler = async (event) => {
   };
 
   if (nextStep === 4) {
-    nextSession.key = crypto.randomBytes(32).toString('hex').toUpperCase();
+    nextSession.key = encryptAtRest(crypto.randomBytes(32).toString('hex').toUpperCase());
     nextSession.keyExpiresAt = now + KEY_TTL_MS;
   }
 

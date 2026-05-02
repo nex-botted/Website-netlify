@@ -3,7 +3,8 @@ const crypto = require('crypto');
 const {
   verifyKeySignature,
   hashHwid,
-  encryptPayload
+  encryptPayload,
+  decryptAtRest
 } = require('./shared/crypto');
 
 function json(data, status = 200) {
@@ -113,8 +114,13 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Key mismatch' }, 403);
   }
 
+  const decryptedKey = decryptAtRest(session.key);
+  if (!decryptedKey) {
+    return json({ ok: false, error: 'Key unavailable' }, 500);
+  }
+
   const providedKey = Buffer.from(String(key));
-  const storedKey = Buffer.from(session.key);
+  const storedKey = Buffer.from(decryptedKey);
   if (providedKey.length !== storedKey.length || !crypto.timingSafeEqual(providedKey, storedKey)) {
     return json({ ok: false, error: 'Key mismatch' }, 403);
   }
