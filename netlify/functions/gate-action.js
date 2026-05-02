@@ -31,6 +31,9 @@ function getClientIp(event) {
     '0.0.0.0'
   );
 }
+function hashUa(ua) {
+  return crypto.createHash('sha256').update(String(ua || '')).digest('hex').slice(0, 16);
+}
 
 function hasTrustedOrigin(event) {
   const origin = event.headers?.origin;
@@ -70,8 +73,10 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Invalid action' }, 400);
   }
 
+  const ip = getClientIp(event);
+  const uaHash = hashUa(event.headers?.['user-agent'] || '');
   const tokenData = verifyToken(String(st || ''));
-  if (!tokenData || tokenData.sid !== sessionId || tokenData.exp < Date.now()) {
+  if (!tokenData || tokenData.sid !== sessionId || tokenData.ip !== ip || tokenData.ua !== uaHash) {
     return json({ ok: false, error: 'Invalid session token' }, 403);
   }
 
@@ -88,7 +93,6 @@ exports.handler = async (event) => {
   }
 
   const now = Date.now();
-  const ip = getClientIp(event);
 
   const ipRateKey = `rl:gate:ip:${ip}`;
   const ipRateRaw = await store.get(ipRateKey, { type: 'json' });

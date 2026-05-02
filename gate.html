@@ -256,7 +256,6 @@ body{
 (function () {
   'use strict';
 
-  // ── CONSTANTS ────────────────────────────────────────────────────────────────
   var COUNTDOWN_SECS   = 3;
   var FETCH_TIMEOUT_MS = 10000;
   var SID_PATTERN      = /^[A-Za-z0-9_\-]{8,128}$/;
@@ -266,12 +265,8 @@ body{
   var NONCE_COOKIE_KEY = 'incognito_nc';
   var TS_COOKIE_KEY    = 'incognito_ts';
 
-  // Minimum ms that must elapse between step initiations (anti-spam).
-  // Backend must also enforce this; this is a supplemental client-side brake.
   var MIN_STEP_INTERVAL_MS = 1500;
 
-  // ── GLOBAL LOCK ──────────────────────────────────────────────────────────────
-  // Prevents ANY re-entry: duplicate calls, rapid navigation, race conditions.
   var _locked = false;
 
   function acquireLock() {
@@ -281,10 +276,7 @@ body{
     return true;
   }
 
-  // Once locked for a step, we never release within this page load —
-  // the page either redirects or shows an error (terminal state).
 
-  // ── DOM HELPERS ──────────────────────────────────────────────────────────────
   function $(id) { return document.getElementById(id); }
 
   function showState(name) {
@@ -293,8 +285,6 @@ body{
     });
   }
 
-  // ── SAFE ERROR DISPLAY ───────────────────────────────────────────────────────
-  // Accepts only safe, generic messages — never echoes raw server/API output.
   function showError(title, code) {
     var safeMessages = {
       'session_missing':    'Start the flow from your executor.',
@@ -315,10 +305,25 @@ body{
     $('err-msg').textContent   = safeMessages[code] || safeMessages['unexpected'];
   }
 
-  // ── COOKIE HELPERS ───────────────────────────────────────────────────────────
+
+  function b64UrlEncode(str) {
+    return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+
+  function b64UrlDecode(str) {
+    var b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    return decodeURIComponent(escape(atob(b64)));
+  }
+
+  function encodeClientValue(value) {
+    return 'v1.' + b64UrlEncode(String(value));
+  }
+
   function setCookie(name, value, minutes) {
     var expires = new Date(Date.now() + minutes * 60000).toUTCString();
-    document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value)
+    var encoded = encodeClientValue(value);
+    document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(encoded)
       + ';expires=' + expires + ';path=/;SameSite=Strict;Secure';
   }
 
@@ -334,7 +339,6 @@ body{
       + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Strict';
   }
 
-  // ── NONCE (one-use replay mitigation) ────────────────────────────────────────
   function generateNonce() {
     var arr = new Uint8Array(16);
     crypto.getRandomValues(arr);
@@ -347,8 +351,6 @@ body{
     return nc;
   }
 
-  // ── TIMESTAMP GUARD ──────────────────────────────────────────────────────────
-  // Prevents machine-speed step cycling. Records the time the last step started.
   function recordStepTimestamp() {
     setCookie(TS_COOKIE_KEY, String(Date.now()), 30);
   }
@@ -361,7 +363,6 @@ body{
     return (Date.now() - ts) < MIN_STEP_INTERVAL_MS;
   }
 
-  // ── INPUT VALIDATION ─────────────────────────────────────────────────────────
   function isValidSid(sid) {
     return typeof sid === 'string' && SID_PATTERN.test(sid);
   }
@@ -370,7 +371,6 @@ body{
     return typeof step === 'string' && VALID_STEPS.indexOf(step) !== -1;
   }
 
-  // ── FETCH WITH TIMEOUT ───────────────────────────────────────────────────────
   function fetchWithTimeout(url, options, timeoutMs) {
     return new Promise(function (resolve, reject) {
       var timer = setTimeout(function () {
@@ -387,10 +387,6 @@ body{
     });
   }
 
-  // ── API CALL ─────────────────────────────────────────────────────────────────
-  // Returns { ok: bool, error: string } always — never throws.
-// ── API CALL ─────────────────────────────────────────────────────────────────
-// Returns { ok: bool, error: string } always — never throws.
 async function gateAction(sid, st, step) {
 
   function mapStepToAction(step) {
@@ -455,9 +451,7 @@ var body = JSON.stringify({
   };
 }
 
-  // ── STEP INDICATOR UPDATE ────────────────────────────────────────────────────
   function updateStepUI(activeStep) {
-    // activeStep: 1, 2, 3, or 4 (done)
     for (var i = 1; i <= 3; i++) {
       var circle = $('s' + i);
       var label  = $('sl' + i);
@@ -471,15 +465,12 @@ var body = JSON.stringify({
         label.classList.add('active');
       }
     }
-    // Lines
     for (var j = 1; j <= 2; j++) {
       var line = $('line' + j);
       line.classList.toggle('filled', j < activeStep);
     }
   }
 
-  // ── COUNTDOWN + REDIRECT ─────────────────────────────────────────────────────
-  // destination must be validated before calling this function.
   function startCountdown(titleText, subText, destination) {
     $('cd-title').textContent = String(titleText).substring(0, 80);
     $('cd-sub').textContent   = String(subText).substring(0, 120);
@@ -500,14 +491,11 @@ var body = JSON.stringify({
 
       if (t <= 0) {
         clearInterval(interval);
-        // Hard redirect — no JS navigation that can be spoofed.
         window.location.replace(destination);
       }
     }, 1000);
   }
 
-  // ── SAFE URL BUILDER ─────────────────────────────────────────────────────────
-  // Only returns URLs that belong to known safe patterns.
   var LV_LINKS = {
     '1': 'https://link-hub.net/5418777/Hp6R8sD9NW4S',
     '2': 'https://link-target.net/5418777/7LM5gMCFdkGP',
@@ -515,55 +503,44 @@ var body = JSON.stringify({
   };
 
   function keyPageUrl() {
-    // Keep session identifiers out of URL query params.
     return '/key';
   }
 
-  // ── MAIN FLOW ────────────────────────────────────────────────────────────────
   async function run() {
-    // 1. Parse and strictly validate URL parameters.
     var params = new URLSearchParams(window.location.search);
     var step   = params.get('step');
     var sidParam = params.get('sid');
     var stParam = params.get('st');
 
-    // Immediately wipe the SID from the URL bar to reduce shoulder-surfing risk.
-    // This is cosmetic but reduces accidental sharing.
     if (sidParam && window.history && window.history.replaceState) {
       var cleanUrl = window.location.pathname + '?step=' + encodeURIComponent(step || '');
       window.history.replaceState(null, '', cleanUrl);
     }
 
-    // 2. Validate step parameter before anything else.
     if (!isValidStep(step)) {
       showError('Invalid Page', 'step_invalid');
       return;
     }
 
-    // 3. Resolve SID — URL param takes precedence (entry point), else cookie.
     var sid = isValidSid(sidParam) ? sidParam
             : isValidSid(getCookie(STEP_COOKIE_KEY)) ? getCookie(STEP_COOKIE_KEY)
             : null;
     var st = (typeof stParam === 'string' && stParam.length > 20) ? stParam : getCookie(TOKEN_COOKIE_KEY);
 
-    // 4. Acquire the lock. If already processing, do nothing.
     if (!acquireLock()) return;
 
-    // 5. Anti-spam timing guard.
     if (isStepTooFast()) {
       showError('Too Fast', 'rate_limited');
       return;
     }
     recordStepTimestamp();
 
-    // ── STEP 1 ────────────────────────────────────────────────────────────────
     if (step === '1') {
       if (!isValidSid(sidParam)) {
         showError('Invalid Link', 'session_invalid');
         return;
       }
 
-      // Persist SID in cookie (30 min). Overwrite any prior cookie.
       deleteCookie(STEP_COOKIE_KEY);
       setCookie(STEP_COOKIE_KEY, sidParam, 30);
       if (stParam) setCookie(TOKEN_COOKIE_KEY, stParam, 30);
@@ -583,13 +560,11 @@ var body = JSON.stringify({
       return;
     }
 
-    // ── STEPS 2, 3, done — require a valid SID from cookie ───────────────────
     if (!isValidSid(sid)) {
       showError('Session Missing', 'session_missing');
       return;
     }
 
-    // ── STEP 2 ────────────────────────────────────────────────────────────────
     if (step === '2') {
       updateStepUI(2);
       showState('loading');
@@ -604,7 +579,6 @@ var body = JSON.stringify({
       return;
     }
 
-    // ── STEP 3 ────────────────────────────────────────────────────────────────
     if (step === '3') {
       updateStepUI(3);
       showState('loading');
@@ -619,9 +593,6 @@ var body = JSON.stringify({
       return;
     }
 
-    // ── DONE ──────────────────────────────────────────────────────────────────
-    // Must verify with backend that ALL prior steps are complete.
-    // Never allow reaching /key without a successful server confirmation.
     if (step === 'done') {
       updateStepUI(4);
       showState('loading');
@@ -638,7 +609,6 @@ var body = JSON.stringify({
         return;
       }
 
-      // Clear SID cookie after confirmed completion so it cannot be replayed.
       deleteCookie(STEP_COOKIE_KEY);
       deleteCookie(NONCE_COOKIE_KEY);
       deleteCookie(TS_COOKIE_KEY);
@@ -647,11 +617,9 @@ var body = JSON.stringify({
       return;
     }
 
-    // Should be unreachable because of isValidStep check above.
     showError('Invalid Page', 'step_invalid');
   }
 
-  // ── CUSTOM CURSOR ────────────────────────────────────────────────────────────
   (function initCursor() {
     var cur  = $('cur');
     var ring = $('cur-ring');
@@ -673,8 +641,6 @@ var body = JSON.stringify({
     animRing();
   })();
 
-  // ── BOOT ─────────────────────────────────────────────────────────────────────
-  // Wrap run() so any unhandled exception is caught safely.
   run().catch(function () {
     showError('Unexpected Error', 'unexpected');
   });

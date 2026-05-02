@@ -484,7 +484,6 @@ footer{max-width:1160px;margin:0 auto;padding:36px 32px;display:flex;align-items
 </div>
 
 <script>
-// ── CURSOR
 const dot=document.getElementById('cur-dot'),cross=document.getElementById('cur-cross'),ring=document.getElementById('cur-ring');
 let mx=0,my=0,rx=0,ry=0;
 document.addEventListener('mousemove',e=>{
@@ -498,7 +497,6 @@ document.querySelectorAll('a,button,.tcard,.pcard,.about-block,.sup-card').forEa
   el.addEventListener('mouseleave',()=>{dot.style.width='8px';dot.style.height='8px';ring.style.width='44px';ring.style.height='44px';ring.style.borderColor='rgba(255,255,255,0.2)'});
 });
 
-// ── ROUTING
 function goPage(id){
   document.querySelectorAll('.page').forEach(p=>{p.classList.remove('active');p.style.display='none'});
   const pg=document.getElementById('page-'+id);
@@ -512,7 +510,6 @@ function goPage(id){
 }
 document.querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();goPage(el.dataset.nav)}));
 
-// ── 3D TILT
 function initTilt(){
   document.querySelectorAll('.tcard').forEach(card=>{
     card.addEventListener('mousemove',e=>{
@@ -527,7 +524,6 @@ function initTilt(){
 }
 initTilt();
 
-// ── SCROLL REVEAL
 function runReveal(){
   document.querySelectorAll('.reveal:not(.vis)').forEach((el,i)=>{
     const obs=new IntersectionObserver(entries=>{

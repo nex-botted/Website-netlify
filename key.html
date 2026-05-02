@@ -242,7 +242,6 @@ body{
 </div>
 
 <script>
-// Cursor
 const cur  = document.getElementById('cur');
 const ring = document.getElementById('cur-ring');
 let mx=0,my=0,rx=0,ry=0;
@@ -262,30 +261,31 @@ function getCookie(name) {
   return m ? m.pop() : null;
 }
 
+const SID_RE = /^[a-f0-9]{32}$/i;
+
 async function fetchKey(sid, st) {
-  const res = await fetch(`/api/get-key?sid=${encodeURIComponent(sid)}&st=${encodeURIComponent(st || '')}`);
+  const res = await fetch(`/api/get-key?sid=${encodeURIComponent(sid)}&st=${encodeURIComponent(st || '')}`, { cache: 'no-store' });
   return res.json();
 }
 
 async function init() {
-  const sid    = getCookie('incognito_sid');
-  const st     = getCookie('incognito_st');
+  const sid = getCookie('incognito_sid');
+  const st  = getCookie('incognito_st');
 
-  if (!sid) {
+  if (!sid || !SID_RE.test(sid)) {
     show('state-error');
     document.getElementById('err-title').textContent = 'No Session Found';
     document.getElementById('err-msg').textContent   = 'Your session could not be found. Please restart the key process from the executor.';
     return;
   }
 
-  if (!st) {
+  if (!st || st.length < 20) {
     show('state-error');
     document.getElementById('err-title').textContent = 'Invalid Session Token';
     document.getElementById('err-msg').textContent   = 'Session token is missing. Restart from the key system.';
     return;
   }
 
-  // Always fetch from API; never trust a client-stored key value.
   let data;
   try { data = await fetchKey(sid, st); }
   catch {
@@ -327,7 +327,6 @@ function copyKey() {
   });
 }
 
-// Key box shimmer on hover
 document.getElementById('key-box').addEventListener('mousemove', e => {
   const r = e.currentTarget.getBoundingClientRect();
   const x = ((e.clientX - r.left) / r.width * 100).toFixed(1);

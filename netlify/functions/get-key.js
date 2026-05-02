@@ -1,4 +1,5 @@
 const { getStore } = require('@netlify/blobs');
+const crypto = require('crypto');
 const { verifyToken } = require('./shared/crypto');
 
 function json(data, status = 200) {
@@ -23,6 +24,9 @@ function getClientIp(event) {
 
 const IP_WINDOW_MS = 5 * 60 * 1000;
 const IP_MAX_REQUESTS = 20;
+function hashUa(ua) {
+  return crypto.createHash('sha256').update(String(ua || '')).digest('hex').slice(0, 16);
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
@@ -35,8 +39,10 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Invalid session' }, 400);
   }
 
+  const ip = getClientIp(event);
+  const uaHash = hashUa(event.headers?.['user-agent'] || '');
   const tokenData = verifyToken(String(st || ''));
-  if (!tokenData || tokenData.sid !== sessionId || tokenData.exp < Date.now()) {
+  if (!tokenData || tokenData.sid !== sessionId || tokenData.ip !== ip || tokenData.ua !== uaHash) {
     return json({ ok: false, error: 'Invalid session token' }, 403);
   }
 
@@ -51,7 +57,6 @@ exports.handler = async (event) => {
   if (!session) return json({ ok: false, error: 'Invalid session' }, 404);
 
   const now = Date.now();
-  const ip = getClientIp(event);
   const ipRateKey = `rl:getkey:ip:${ip}`;
   const ipRateRaw = await store.get(ipRateKey, { type: 'json' });
   const ipRecent = ((ipRateRaw?.timestamps) || []).filter(ts => ts > now - IP_WINDOW_MS);
