@@ -31,6 +31,9 @@ function getClientIp(event) {
     '0.0.0.0'
   );
 }
+function hashUa(ua) {
+  return crypto.createHash('sha256').update(String(ua || '')).digest('hex').slice(0, 16);
+}
 
 function hasTrustedOrigin(event) {
   const origin = event.headers?.origin;
@@ -60,7 +63,7 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Invalid JSON' }, 400);
   }
 
-  const { sessionId, action, st } = body || {};
+  const { sessionId, action, st, nonce } = body || {};
 
   if (typeof sessionId !== 'string' || !/^[a-f0-9]{32}$/i.test(sessionId)) {
     return invalid();
@@ -69,9 +72,14 @@ exports.handler = async (event) => {
   if (typeof action !== 'string' || !ALLOWED_ACTIONS.has(action)) {
     return json({ ok: false, error: 'Invalid action' }, 400);
   }
+  if (typeof nonce !== 'string' || !/^[a-f0-9]{32}$/i.test(nonce)) {
+    return json({ ok: false, error: 'invalid_nonce' }, 400);
+  }
 
+  const ip = getClientIp(event);
+  const uaHash = hashUa(event.headers?.['user-agent'] || '');
   const tokenData = verifyToken(String(st || ''));
-  if (!tokenData || tokenData.sid !== sessionId || tokenData.exp < Date.now()) {
+  if (!tokenData || tokenData.sid !== sessionId || tokenData.ip !== ip || tokenData.ua !== uaHash) {
     return json({ ok: false, error: 'Invalid session token' }, 403);
   }
 
@@ -86,9 +94,14 @@ exports.handler = async (event) => {
   if (!session || session.sessionId !== sessionId) {
     return invalid();
   }
+  if (!session.nonce && step === 0) {
+    session.nonce = nonce;
+  }
+  if (!session.nonce || session.nonce !== nonce) {
+    return json({ ok: false, error: 'invalid_nonce' }, 403);
+  }
 
   const now = Date.now();
-  const ip = getClientIp(event);
 
   const ipRateKey = `rl:gate:ip:${ip}`;
   const ipRateRaw = await store.get(ipRateKey, { type: 'json' });
@@ -150,6 +163,7 @@ exports.handler = async (event) => {
     ...session,
     step: nextStep,
     stepTimestamps: nextTimestamps,
+    nonce: crypto.randomBytes(16).toString('hex')
   };
 
   if (nextStep === 4) {
@@ -159,9 +173,9 @@ exports.handler = async (event) => {
 
   await store.setJSON(storeKey, nextSession);
 
-  if (nextStep === 4) return json({ ok: true });
+  if (nextStep === 4) return json({ ok: true, nonce: nextSession.nonce });
 
-  return json({ ok: true });
+  return json({ ok: true, nonce: nextSession.nonce });
 };
 
 exports.config = { path: '/api/gate-action' };

@@ -4,6 +4,9 @@ const { hashHwid, signToken } = require('./shared/crypto');
 
 const SESSION_TTL_MS  = 30 * 60 * 1000;
 const HWID_RATE_LIMIT = 3;
+function hashUa(ua) {
+  return crypto.createHash('sha256').update(String(ua || '')).digest('hex').slice(0, 16);
+}
 
 function json(data, status = 200) {
   return {
@@ -74,7 +77,6 @@ exports.handler = async (event, context) => {
 
   const now = Date.now();
 
-  // ── HWID rate limit ──
   const rlKey = `rl:hwid:${hwidHash}`;
   const rlRaw = await store.get(rlKey, { type: 'json' });
 
@@ -93,7 +95,6 @@ exports.handler = async (event, context) => {
   recent.push(now);
   await store.setJSON(rlKey, { timestamps: recent });
 
-  // ── IP rate limit ──
   const ip =
     event.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
     event.headers?.['client-ip'] ||
@@ -111,7 +112,6 @@ exports.handler = async (event, context) => {
   ipRecent.push(now);
   await store.setJSON(ipKey, { timestamps: ipRecent });
 
-  // ── Create session ──
   const sessionId = crypto.randomUUID().replace(/-/g, '');
 
   const session = {
@@ -120,6 +120,7 @@ exports.handler = async (event, context) => {
     ip,
     step: 0,
     stepTimestamps: {},
+    nonce: crypto.randomBytes(16).toString('hex'),
     key: null,
     createdAt: now,
     expiresAt: now + SESSION_TTL_MS,
@@ -130,13 +131,16 @@ exports.handler = async (event, context) => {
   const reqUrl = new URL(event.rawUrl);
   const baseUrl = `${reqUrl.protocol}//${reqUrl.host}`;
 
-  const sessionToken = signToken({ sid: sessionId, exp: now + SESSION_TTL_MS });
+  const userAgent = event.headers?.['user-agent'] || '';
+  const uaHash = hashUa(userAgent);
+  const boundToken = signToken({ sid: sessionId, exp: now + SESSION_TTL_MS, ip, ua: uaHash });
 
   return json({
     ok: true,
     sessionId,
-    sessionToken,
-    gateUrl: `${baseUrl}/gate?step=1&sid=${sessionId}&st=${encodeURIComponent(sessionToken)}`,
+    sessionToken: boundToken,
+    nonce: session.nonce,
+    gateUrl: `${baseUrl}/gate?step=1&sid=${sessionId}&st=${encodeURIComponent(boundToken)}`,
     expiresIn: SESSION_TTL_MS / 1000,
   }, 201);
 };
