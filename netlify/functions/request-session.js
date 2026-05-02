@@ -139,7 +139,6 @@ exports.handler = async (event, context) => {
     ok: true,
     sessionId,
     sessionToken: boundToken,
-    nonce: session.nonce,
     gateUrl: `${baseUrl}/gate?step=1&sid=${sessionId}&st=${encodeURIComponent(boundToken)}`,
     expiresIn: SESSION_TTL_MS / 1000,
   }, 201);

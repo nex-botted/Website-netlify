@@ -264,8 +264,7 @@ function getCookie(name) {
 const SID_RE = /^[a-f0-9]{32}$/i;
 
 async function fetchKey(sid, st) {
-  const nonce = getCookie('incognito_nc') || '';
-  const res = await fetch(`/api/get-key?sid=${encodeURIComponent(sid)}&st=${encodeURIComponent(st || '')}`, { cache: 'no-store', headers: { 'X-Inc-Nonce': nonce } });
+  const res = await fetch(`/api/get-key?sid=${encodeURIComponent(sid)}&st=${encodeURIComponent(st || '')}`, { cache: 'no-store' });
   return res.json();
 }
 
