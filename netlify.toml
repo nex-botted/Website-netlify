@@ -48,6 +48,17 @@
   to = "/beta.html"
   status = 200
 
+
+[[redirects]]
+  from = "/security-client.js"
+  to = "/security-client.js"
+  status = 200
+
+[[redirects]]
+  from = "/.netlify/scripts/rum"
+  to = "/.netlify/scripts/rum"
+  status = 200
+
 # Block known probing and malformed request patterns
 [[redirects]]
   from = "/.netlify/scripts/*"
