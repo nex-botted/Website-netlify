@@ -1,6 +1,6 @@
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
-const { hashHwid } = require('./shared/crypto');
+const { hashHwid, signToken } = require('./shared/crypto');
 
 const SESSION_TTL_MS  = 30 * 60 * 1000;
 const HWID_RATE_LIMIT = 3;
@@ -130,10 +130,13 @@ exports.handler = async (event, context) => {
   const reqUrl = new URL(event.rawUrl);
   const baseUrl = `${reqUrl.protocol}//${reqUrl.host}`;
 
+  const sessionToken = signToken({ sid: sessionId, exp: now + SESSION_TTL_MS });
+
   return json({
     ok: true,
     sessionId,
-    gateUrl: `${baseUrl}/gate?step=1&sid=${sessionId}`,
+    sessionToken,
+    gateUrl: `${baseUrl}/gate?step=1&sid=${sessionId}&st=${encodeURIComponent(sessionToken)}`,
     expiresIn: SESSION_TTL_MS / 1000,
   }, 201);
 };

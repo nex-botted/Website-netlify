@@ -1,4 +1,5 @@
 const { getStore } = require('@netlify/blobs');
+const { verifyToken } = require('./shared/crypto');
 
 function json(data, status = 200) {
   return {
@@ -29,8 +30,14 @@ exports.handler = async (event) => {
   }
 
   const sessionId = event.queryStringParameters?.sid;
+  const st = event.queryStringParameters?.st;
   if (typeof sessionId !== 'string' || !/^[a-f0-9]{32}$/i.test(sessionId)) {
     return json({ ok: false, error: 'Invalid session' }, 400);
+  }
+
+  const tokenData = verifyToken(String(st || ''));
+  if (!tokenData || tokenData.sid !== sessionId || tokenData.exp < Date.now()) {
+    return json({ ok: false, error: 'Invalid session token' }, 403);
   }
 
   const store = getStore({

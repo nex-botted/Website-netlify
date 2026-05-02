@@ -1,5 +1,6 @@
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
+const { verifyToken } = require('./shared/crypto');
 
 const ALLOWED_ACTIONS = new Set(['start_1', 'complete_1', 'complete_2', 'complete_3']);
 const STEP_DELAY_MS = 5000;
@@ -59,7 +60,7 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'Invalid JSON' }, 400);
   }
 
-  const { sessionId, action } = body || {};
+  const { sessionId, action, st } = body || {};
 
   if (typeof sessionId !== 'string' || !/^[a-f0-9]{32}$/i.test(sessionId)) {
     return invalid();
@@ -67,6 +68,11 @@ exports.handler = async (event) => {
 
   if (typeof action !== 'string' || !ALLOWED_ACTIONS.has(action)) {
     return json({ ok: false, error: 'Invalid action' }, 400);
+  }
+
+  const tokenData = verifyToken(String(st || ''));
+  if (!tokenData || tokenData.sid !== sessionId || tokenData.exp < Date.now()) {
+    return json({ ok: false, error: 'Invalid session token' }, 403);
   }
 
   const store = getStore({

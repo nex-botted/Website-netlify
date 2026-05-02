@@ -262,19 +262,27 @@ function getCookie(name) {
   return m ? m.pop() : null;
 }
 
-async function fetchKey(sid) {
-  const res = await fetch(`/api/get-key?sid=${sid}`);
+async function fetchKey(sid, st) {
+  const res = await fetch(`/api/get-key?sid=${encodeURIComponent(sid)}&st=${encodeURIComponent(st || '')}`);
   return res.json();
 }
 
 async function init() {
   const params = new URLSearchParams(location.search);
   const sid    = params.get('sid') || getCookie('incognito_sid');
+  const st     = params.get('st') || getCookie('incognito_st');
 
   if (!sid) {
     show('state-error');
     document.getElementById('err-title').textContent = 'No Session Found';
     document.getElementById('err-msg').textContent   = 'Your session could not be found. Please restart the key process from the executor.';
+    return;
+  }
+
+  if (!st) {
+    show('state-error');
+    document.getElementById('err-title').textContent = 'Invalid Session Token';
+    document.getElementById('err-msg').textContent   = 'Session token is missing. Restart from the key system.';
     return;
   }
 
@@ -287,7 +295,7 @@ async function init() {
 
   // Otherwise fetch from API
   let data;
-  try { data = await fetchKey(sid); }
+  try { data = await fetchKey(sid, st); }
   catch {
     show('state-error');
     document.getElementById('err-title').textContent = 'Network Error';
