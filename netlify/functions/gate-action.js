@@ -8,13 +8,25 @@ const KEY_TTL_MS = 24 * 60 * 60 * 1000;
 function json(data, status = 200) {
   return {
     statusCode: status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    },
     body: JSON.stringify(data),
   };
 }
 
 function invalid() {
   return json({ ok: false, error: 'Invalid session' }, 400);
+}
+
+function getClientIp(event) {
+  return (
+    event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    event.headers['client-ip'] ||
+    '0.0.0.0'
+  );
 }
 
 exports.handler = async (event) => {
@@ -52,9 +64,14 @@ exports.handler = async (event) => {
   }
 
   const now = Date.now();
+  const ip = getClientIp(event);
 
   if (typeof session.expiresAt !== 'number' || session.expiresAt <= now) {
     return json({ ok: false, error: 'Session expired' }, 410);
+  }
+
+  if (session.ip && session.ip !== ip) {
+    return json({ ok: false, error: 'ip_mismatch' }, 403);
   }
 
   const step = Number.isInteger(session.step) ? session.step : 0;
@@ -109,9 +126,7 @@ exports.handler = async (event) => {
 
   await store.setJSON(storeKey, nextSession);
 
-  if (nextStep === 4) {
-    return json({ ok: true, key: nextSession.key });
-  }
+  if (nextStep === 4) return json({ ok: true });
 
   return json({ ok: true });
 };
