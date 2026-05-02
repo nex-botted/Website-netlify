@@ -209,6 +209,38 @@ function encryptPayload(obj, sessionSaltHex) {
   };
 }
 
+
+function getDataKey() {
+  const raw = process.env.DATA_ENC_KEY || process.env.AES_MASTER_KEY || process.env.KEY_PEPPER;
+  if (!raw) throw new Error('DATA_ENC_KEY (or AES_MASTER_KEY/KEY_PEPPER) not set');
+  if (/^[a-f0-9]{64}$/i.test(raw)) return Buffer.from(raw, 'hex');
+  return crypto.createHash('sha256').update(String(raw)).digest();
+}
+
+function encryptAtRest(plaintext) {
+  const iv = crypto.randomBytes(12);
+  const key = getDataKey();
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([cipher.update(String(plaintext), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `v1:${iv.toString('base64url')}:${tag.toString('base64url')}:${ct.toString('base64url')}`;
+}
+
+function decryptAtRest(blob) {
+  if (typeof blob !== 'string') return null;
+  const parts = blob.split(':');
+  if (parts.length !== 4 || parts[0] !== 'v1') return null;
+  try {
+    const iv = Buffer.from(parts[1], 'base64url');
+    const tag = Buffer.from(parts[2], 'base64url');
+    const ct = Buffer.from(parts[3], 'base64url');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', getDataKey(), iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
+  } catch {
+    return null;
+  }
+}
 module.exports = {
   b58enc,
   getPepper,
@@ -218,5 +250,7 @@ module.exports = {
   hashHwid,
   signToken,
   verifyToken,
-  encryptPayload
+  encryptPayload,
+  encryptAtRest,
+  decryptAtRest
 };

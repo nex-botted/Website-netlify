@@ -34,4 +34,6 @@
     Permissions-Policy = "geolocation=(), camera=(), microphone=()"
     Cross-Origin-Opener-Policy = "same-origin"
     Cross-Origin-Resource-Policy = "same-origin"
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    X-Permitted-Cross-Domain-Policies = "none"
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.ibb.co; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; upgrade-insecure-requests"
