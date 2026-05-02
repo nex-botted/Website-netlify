@@ -45,6 +45,10 @@ exports.handler = async (event) => {
   if (!tokenData || tokenData.sid !== sessionId || tokenData.ip !== ip || tokenData.ua !== uaHash) {
     return json({ ok: false, error: 'Invalid session token' }, 403);
   }
+  const clientNonce = String(event.headers?.['x-inc-nonce'] || '');
+  if (!/^[a-f0-9]{32}$/i.test(clientNonce)) {
+    return json({ ok: false, error: 'invalid_nonce' }, 400);
+  }
 
   const store = getStore({
     name: 'incognito-sessions',
@@ -55,6 +59,9 @@ exports.handler = async (event) => {
 
   const session = await store.get(`session:${sessionId}`, { type: 'json' });
   if (!session) return json({ ok: false, error: 'Invalid session' }, 404);
+  if (!session.nonce || session.nonce !== clientNonce) {
+    return json({ ok: false, error: 'invalid_nonce' }, 403);
+  }
 
   const now = Date.now();
   const ipRateKey = `rl:getkey:ip:${ip}`;

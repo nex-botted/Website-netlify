@@ -120,6 +120,7 @@ exports.handler = async (event, context) => {
     ip,
     step: 0,
     stepTimestamps: {},
+    nonce: crypto.randomBytes(16).toString('hex'),
     key: null,
     createdAt: now,
     expiresAt: now + SESSION_TTL_MS,
