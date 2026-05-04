@@ -15,7 +15,13 @@
 html{scroll-behavior:smooth}
 body{background:#0b0e0c;color:#fff;font-family:'Sora',sans-serif;font-weight:300;overflow-x:hidden;cursor:none;min-height:100vh}
 html.light-theme{filter:invert(1) hue-rotate(180deg)}
-html.light-theme img{filter:invert(1) hue-rotate(180deg)}
+html.light-theme .no-theme-invert,
+html.light-theme .tc-icon,
+html.light-theme .dc-icon,
+html.light-theme .sup-icon,
+html.light-theme .copy-icon,
+html.light-theme .success-icon,
+html.light-theme .err-icon{filter:invert(1) hue-rotate(180deg)}
 
 /* CURSOR */
 #cur-dot{position:fixed;width:8px;height:8px;background:#fff;border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:width .15s,height .15s}
@@ -218,7 +224,7 @@ footer{max-width:1160px;margin:0 auto;padding:36px 32px;display:flex;align-items
       <li><a href="#" data-nav="community">Community</a></li>
     </ul>
     <div class="nav-btns">
-      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" title="Toggle theme">◐</button>
+      <button id="theme-toggle" class="theme-toggle no-theme-invert" aria-label="Toggle theme" title="Toggle theme">◐</button>
       <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-ghost">Join our Discord</a>
       <a href="#" data-nav="pricing" class="btn-solid">Get Started →</a>
     </div>

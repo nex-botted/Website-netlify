@@ -7,6 +7,9 @@ const STEP_DELAY_MS = 5000;
 const KEY_TTL_MS = 24 * 60 * 60 * 1000;
 const IP_WINDOW_MS = 5 * 60 * 1000;
 const IP_MAX_REQUESTS = 60;
+const BLOCKED_UA_PATTERNS = [
+  /sqlmap/i, /nikto/i, /acunetix/i, /nessus/i, /openvas/i, /burpsuite/i, /zap/i, /nmap/i
+];
 
 function json(data, status = 200) {
   return {
@@ -47,9 +50,19 @@ function hasTrustedOrigin(event) {
   }
 }
 
+function isSuspiciousRequest(event) {
+  const ua = String(event.headers?.['user-agent'] || '');
+  const probeHeaders = ['x-zap-scan', 'x-attack-proxy', 'x-sqlmap', 'x-pentest-tool'];
+  return BLOCKED_UA_PATTERNS.some((rx) => rx.test(ua)) ||
+    probeHeaders.some((h) => event.headers?.[h]);
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
+  }
+  if (isSuspiciousRequest(event)) {
+    return json({ ok: false, error: 'forbidden_client' }, 403);
   }
 
   if (!hasTrustedOrigin(event)) {
