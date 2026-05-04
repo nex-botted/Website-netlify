@@ -1,6 +1,6 @@
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
-const { verifyToken, encryptAtRest } = require('./shared/crypto');
+const { verifyToken, encryptAtRest, generateSignedLicenseKey } = require('./shared/crypto');
 
 const ALLOWED_ACTIONS = new Set(['start_1', 'complete_1', 'complete_2', 'complete_3']);
 const STEP_DELAY_MS = 5000;
@@ -94,6 +94,7 @@ exports.handler = async (event) => {
   if (!session || session.sessionId !== sessionId) {
     return invalid();
   }
+  const step = Number.isInteger(session.step) ? session.step : 0;
   if (!session.nonce && step === 0) {
     session.nonce = nonce;
   }
@@ -120,7 +121,6 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'ip_mismatch' }, 403);
   }
 
-  const step = Number.isInteger(session.step) ? session.step : 0;
   const stepTimestamps = session.stepTimestamps && typeof session.stepTimestamps === 'object'
     ? session.stepTimestamps
     : {};
@@ -167,7 +167,11 @@ exports.handler = async (event) => {
   };
 
   if (nextStep === 4) {
-    nextSession.key = encryptAtRest(crypto.randomBytes(32).toString('hex').toUpperCase());
+    const keyId = crypto.randomBytes(6).toString('hex').toUpperCase();
+    const signedKey = generateSignedLicenseKey({ keyId, ttlMs: KEY_TTL_MS });
+    nextSession.key = encryptAtRest(signedKey);
+    nextSession.keyId = keyId;
+    nextSession.keyVersion = 'v2';
     nextSession.keyExpiresAt = now + KEY_TTL_MS;
   }
 

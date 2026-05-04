@@ -2,9 +2,11 @@ const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
 const {
   verifyKeySignature,
+  verifySignedLicenseKey,
   hashHwid,
   encryptPayload,
-  decryptAtRest
+  decryptAtRest,
+  verifyToken
 } = require('./shared/crypto');
 
 function json(data, status = 200) {
@@ -59,6 +61,7 @@ exports.handler = async (event) => {
   }
 
   const { key, hwid, sid } = body;
+  const st = String(body?.st || '');
 
   if (!key || !hwid || !sid) {
     return json({ ok: false, error: 'Missing parameters' }, 400);
@@ -71,10 +74,30 @@ exports.handler = async (event) => {
   if (!/^[0-9a-f]{128}$/i.test(hwid)) {
     return json({ ok: false, error: 'Invalid HWID format' }, 400);
   }
+  const ip = getClientIp(event);
+  const uaHash = crypto
+    .createHash('sha256')
+    .update(String(event.headers?.['user-agent'] || ''))
+    .digest('hex')
+    .slice(0, 16);
+  const tokenData = verifyToken(st);
+  if (!tokenData || tokenData.sid !== sid || tokenData.ip !== ip || tokenData.ua !== uaHash) {
+    return json({ ok: false, error: 'Invalid session token' }, 403);
+  }
 
-  const sigCheck = verifyKeySignature(key);
+  const sigCheck = key.startsWith('incognito_v2_')
+    ? verifySignedLicenseKey(key)
+    : verifyKeySignature(key);
   if (!sigCheck.ok) {
     return json({ ok: false, error: 'Invalid key' }, 403);
+  }
+
+  const revoked = (process.env.REVOKED_KEY_IDS || '')
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+  if (sigCheck.keyId && revoked.includes(sigCheck.keyId)) {
+    return json({ ok: false, error: 'revoked_key' }, 403);
   }
 
   const store = getStore({
@@ -88,7 +111,6 @@ exports.handler = async (event) => {
   if (!session) return json({ ok: false, error: 'Invalid session' }, 404);
 
   const now = Date.now();
-  const ip = getClientIp(event);
   const ipRateKey = `rl:verify:ip:${ip}`;
   const ipRateRaw = await store.get(ipRateKey, { type: 'json' });
   const ipRecent = ((ipRateRaw?.timestamps) || []).filter(ts => ts > now - IP_WINDOW_MS);

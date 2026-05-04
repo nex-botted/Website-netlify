@@ -14,6 +14,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{background:#0b0e0c;color:#fff;font-family:'Sora',sans-serif;font-weight:300;overflow-x:hidden;cursor:none;min-height:100vh}
+html.light-theme{filter:invert(1) hue-rotate(180deg)}
+html.light-theme img{filter:invert(1) hue-rotate(180deg)}
 
 /* CURSOR */
 #cur-dot{position:fixed;width:8px;height:8px;background:#fff;border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:width .15s,height .15s}
@@ -32,6 +34,8 @@ body *{cursor:none!important}
 .nav-links a{padding:7px 16px;color:rgba(255,255,255,0.5);text-decoration:none;font-size:13px;font-weight:400;border-radius:100px;transition:color .2s,background .2s}
 .nav-links a:hover,.nav-links a.active{color:#fff;background:rgba(255,255,255,0.07)}
 .nav-btns{display:flex;gap:8px;align-items:center}
+.theme-toggle{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.8);font-size:15px;display:inline-flex;align-items:center;justify-content:center;transition:all .2s}
+.theme-toggle:hover{background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.35)}
 .btn-ghost{padding:8px 18px;border:1px solid rgba(255,255,255,0.13);background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.65);font-size:13px;font-weight:400;font-family:'Sora',sans-serif;border-radius:100px;text-decoration:none;transition:all .2s;white-space:nowrap}
 .btn-ghost:hover{border-color:rgba(255,255,255,0.32);color:#fff;background:rgba(255,255,255,0.06)}
 .btn-solid{padding:9px 22px;background:#fff;color:#000;font-size:13px;font-weight:600;font-family:'Sora',sans-serif;border:none;border-radius:100px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .2s;white-space:nowrap}
@@ -214,6 +218,7 @@ footer{max-width:1160px;margin:0 auto;padding:36px 32px;display:flex;align-items
       <li><a href="#" data-nav="community">Community</a></li>
     </ul>
     <div class="nav-btns">
+      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" title="Toggle theme">◐</button>
       <a href="https://discord.gg/csvH4jfRcA" target="_blank" class="btn-ghost">Join our Discord</a>
       <a href="#" data-nav="pricing" class="btn-solid">Get Started →</a>
     </div>
@@ -533,6 +538,30 @@ function runReveal(){
   });
 }
 runReveal();
+
+const themeToggle = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('incognito-theme');
+const systemPrefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+const activeTheme = savedTheme || (systemPrefersLight ? 'light' : 'dark');
+
+function applyTheme(theme){
+  document.documentElement.classList.toggle('light-theme', theme === 'light');
+  themeToggle.textContent = theme === 'light' ? '☀' : '☾';
+}
+applyTheme(activeTheme);
+
+themeToggle.addEventListener('click', ()=>{
+  const nextTheme = document.documentElement.classList.contains('light-theme') ? 'dark' : 'light';
+  localStorage.setItem('incognito-theme', nextTheme);
+  applyTheme(nextTheme);
+});
+
+if (window.matchMedia) {
+  const media = window.matchMedia('(prefers-color-scheme: light)');
+  media.addEventListener('change', (e)=>{
+    if (!localStorage.getItem('incognito-theme')) applyTheme(e.matches ? 'light' : 'dark');
+  });
+}
 </script>
 <script src="/security-client.js"></script>
 </body>
