@@ -79,6 +79,37 @@ function generateKey(keyId) {
   return `incognito_v1_${keyId}_${b58enc(entropy)}_${b58enc(sig)}`;
 }
 
+function generateSignedLicenseKey({ keyId, version = 'v2', ttlMs = 24 * 60 * 60 * 1000 }) {
+  const now = Date.now();
+  const payload = {
+    v: version,
+    kid: keyId,
+    iat: now,
+    exp: now + ttlMs,
+    rnd: crypto.randomBytes(12).toString('hex')
+  };
+  const payloadB64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const sig = crypto.createHmac('sha256', getPepper()).update(payloadB64).digest('base64url').slice(0, 32);
+  return `incognito_${version}_${payloadB64}.${sig}`;
+}
+
+function verifySignedLicenseKey(rawKey) {
+  try {
+    if (typeof rawKey !== 'string' || !rawKey.startsWith('incognito_v2_')) return { ok: false };
+    const body = rawKey.slice('incognito_v2_'.length);
+    const [payloadB64, sig] = body.split('.');
+    if (!payloadB64 || !sig) return { ok: false };
+    const expected = crypto.createHmac('sha256', getPepper()).update(payloadB64).digest('base64url').slice(0, 32);
+    if (sig.length !== expected.length) return { ok: false };
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return { ok: false };
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+    if (typeof payload.exp !== 'number' || payload.exp < Date.now()) return { ok: false };
+    return { ok: true, keyId: payload.kid, payload };
+  } catch {
+    return { ok: false };
+  }
+}
+
 function verifyKeySignature(rawKey) {
   try {
     const parts = rawKey.split('_');
@@ -246,7 +277,9 @@ module.exports = {
   getPepper,
   deriveSignature,
   generateKey,
+  generateSignedLicenseKey,
   verifyKeySignature,
+  verifySignedLicenseKey,
   hashHwid,
   signToken,
   verifyToken,
