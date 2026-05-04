@@ -1,12 +1,15 @@
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
-const { verifyToken, encryptAtRest } = require('./shared/crypto');
+const { verifyToken, encryptAtRest, generateSignedLicenseKey } = require('./shared/crypto');
 
 const ALLOWED_ACTIONS = new Set(['start_1', 'complete_1', 'complete_2', 'complete_3']);
 const STEP_DELAY_MS = 5000;
 const KEY_TTL_MS = 24 * 60 * 60 * 1000;
 const IP_WINDOW_MS = 5 * 60 * 1000;
 const IP_MAX_REQUESTS = 60;
+const BLOCKED_UA_PATTERNS = [
+  /sqlmap/i, /nikto/i, /acunetix/i, /nessus/i, /openvas/i, /burpsuite/i, /zap/i, /nmap/i
+];
 
 function json(data, status = 200) {
   return {
@@ -47,9 +50,19 @@ function hasTrustedOrigin(event) {
   }
 }
 
+function isSuspiciousRequest(event) {
+  const ua = String(event.headers?.['user-agent'] || '');
+  const probeHeaders = ['x-zap-scan', 'x-attack-proxy', 'x-sqlmap', 'x-pentest-tool'];
+  return BLOCKED_UA_PATTERNS.some((rx) => rx.test(ua)) ||
+    probeHeaders.some((h) => event.headers?.[h]);
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
+  }
+  if (isSuspiciousRequest(event)) {
+    return json({ ok: false, error: 'forbidden_client' }, 403);
   }
 
   if (!hasTrustedOrigin(event)) {
@@ -94,6 +107,7 @@ exports.handler = async (event) => {
   if (!session || session.sessionId !== sessionId) {
     return invalid();
   }
+  const step = Number.isInteger(session.step) ? session.step : 0;
   if (!session.nonce && step === 0) {
     session.nonce = nonce;
   }
@@ -120,7 +134,6 @@ exports.handler = async (event) => {
     return json({ ok: false, error: 'ip_mismatch' }, 403);
   }
 
-  const step = Number.isInteger(session.step) ? session.step : 0;
   const stepTimestamps = session.stepTimestamps && typeof session.stepTimestamps === 'object'
     ? session.stepTimestamps
     : {};
@@ -167,7 +180,11 @@ exports.handler = async (event) => {
   };
 
   if (nextStep === 4) {
-    nextSession.key = encryptAtRest(crypto.randomBytes(32).toString('hex').toUpperCase());
+    const keyId = crypto.randomBytes(6).toString('hex').toUpperCase();
+    const signedKey = generateSignedLicenseKey({ keyId, ttlMs: KEY_TTL_MS });
+    nextSession.key = encryptAtRest(signedKey);
+    nextSession.keyId = keyId;
+    nextSession.keyVersion = 'v2';
     nextSession.keyExpiresAt = now + KEY_TTL_MS;
   }
 

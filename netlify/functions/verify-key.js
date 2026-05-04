@@ -2,9 +2,11 @@ const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
 const {
   verifyKeySignature,
+  verifySignedLicenseKey,
   hashHwid,
   encryptPayload,
-  decryptAtRest
+  decryptAtRest,
+  verifyToken
 } = require('./shared/crypto');
 
 function json(data, status = 200) {
@@ -41,10 +43,25 @@ function hasTrustedOrigin(event) {
 
 const IP_WINDOW_MS = 5 * 60 * 1000;
 const IP_MAX_REQUESTS = 30;
+const BLOCKED_UA_PATTERNS = [
+  /sqlmap/i, /nikto/i, /acunetix/i, /nessus/i, /openvas/i, /burpsuite/i, /zap/i, /nmap/i
+];
+
+function isSuspiciousRequest(event) {
+  const ua = String(event.headers?.['user-agent'] || '');
+  const probeHeaders = [
+    'x-zap-scan', 'x-attack-proxy', 'x-sqlmap', 'x-pentest-tool'
+  ];
+  return BLOCKED_UA_PATTERNS.some((rx) => rx.test(ua)) ||
+    probeHeaders.some((h) => event.headers?.[h]);
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return json({ ok: false, error: 'Method not allowed' }, 405);
+  }
+  if (isSuspiciousRequest(event)) {
+    return json({ ok: false, error: 'forbidden_client' }, 403);
   }
 
   if (!hasTrustedOrigin(event)) {
@@ -59,6 +76,8 @@ exports.handler = async (event) => {
   }
 
   const { key, hwid, sid } = body;
+  const st = String(body?.st || '');
+  const nonce = String(body?.nonce || event.headers?.['x-inc-nonce'] || '');
 
   if (!key || !hwid || !sid) {
     return json({ ok: false, error: 'Missing parameters' }, 400);
@@ -71,10 +90,30 @@ exports.handler = async (event) => {
   if (!/^[0-9a-f]{128}$/i.test(hwid)) {
     return json({ ok: false, error: 'Invalid HWID format' }, 400);
   }
+  const ip = getClientIp(event);
+  const uaHash = crypto
+    .createHash('sha256')
+    .update(String(event.headers?.['user-agent'] || ''))
+    .digest('hex')
+    .slice(0, 16);
+  const tokenData = verifyToken(st);
+  if (!tokenData || tokenData.sid !== sid || tokenData.ip !== ip || tokenData.ua !== uaHash) {
+    return json({ ok: false, error: 'Invalid session token' }, 403);
+  }
 
-  const sigCheck = verifyKeySignature(key);
+  const sigCheck = key.startsWith('incognito_v2_')
+    ? verifySignedLicenseKey(key)
+    : verifyKeySignature(key);
   if (!sigCheck.ok) {
     return json({ ok: false, error: 'Invalid key' }, 403);
+  }
+
+  const revoked = (process.env.REVOKED_KEY_IDS || '')
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+  if (sigCheck.keyId && revoked.includes(sigCheck.keyId)) {
+    return json({ ok: false, error: 'revoked_key' }, 403);
   }
 
   const store = getStore({
@@ -86,9 +125,11 @@ exports.handler = async (event) => {
 
   const session = await store.get(`session:${sid}`, { type: 'json' });
   if (!session) return json({ ok: false, error: 'Invalid session' }, 404);
+  if (!/^[a-f0-9]{32}$/i.test(nonce) || !session.nonce || nonce !== session.nonce) {
+    return json({ ok: false, error: 'invalid_nonce' }, 403);
+  }
 
   const now = Date.now();
-  const ip = getClientIp(event);
   const ipRateKey = `rl:verify:ip:${ip}`;
   const ipRateRaw = await store.get(ipRateKey, { type: 'json' });
   const ipRecent = ((ipRateRaw?.timestamps) || []).filter(ts => ts > now - IP_WINDOW_MS);
@@ -133,6 +174,7 @@ exports.handler = async (event) => {
     { success: true, ts: now },
     session.sessionId.slice(0, 32)
   );
+  await store.setJSON(`session:${sid}`, { ...session, nonce: crypto.randomBytes(16).toString('hex') });
 
   return json({ ok: true, payload });
 };
