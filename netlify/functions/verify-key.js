@@ -77,6 +77,7 @@ exports.handler = async (event) => {
 
   const { key, hwid, sid } = body;
   const st = String(body?.st || '');
+  const nonce = String(body?.nonce || event.headers?.['x-inc-nonce'] || '');
 
   if (!key || !hwid || !sid) {
     return json({ ok: false, error: 'Missing parameters' }, 400);
@@ -124,6 +125,9 @@ exports.handler = async (event) => {
 
   const session = await store.get(`session:${sid}`, { type: 'json' });
   if (!session) return json({ ok: false, error: 'Invalid session' }, 404);
+  if (!/^[a-f0-9]{32}$/i.test(nonce) || !session.nonce || nonce !== session.nonce) {
+    return json({ ok: false, error: 'invalid_nonce' }, 403);
+  }
 
   const now = Date.now();
   const ipRateKey = `rl:verify:ip:${ip}`;
@@ -170,6 +174,7 @@ exports.handler = async (event) => {
     { success: true, ts: now },
     session.sessionId.slice(0, 32)
   );
+  await store.setJSON(`session:${sid}`, { ...session, nonce: crypto.randomBytes(16).toString('hex') });
 
   return json({ ok: true, payload });
 };
