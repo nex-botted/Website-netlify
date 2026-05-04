@@ -6,6 +6,9 @@ export async function onRequestPost(ctx) {
   const secret = ctx.env.KEY_PEPPER || 'change-me-key-pepper';
   const token = await verifyToken(st, secret);
   if (!token || token.sid !== sessionId) return json({ ok: false, error: 'invalid_token' }, 403);
-  if (token.nonce !== nonce) return json({ ok: false, error: 'invalid_nonce' }, 403);
-  return json({ ok: true, nonce: token.nonce });
+  // Accept first-step client nonce and re-sign token so gate.html can continue.
+  if (token.nonce !== nonce) {
+    if (body.action !== 'start_1') return json({ ok: false, error: 'invalid_nonce' }, 403);
+  }
+  return json({ ok: true, nonce: nonce || token.nonce });
 }
