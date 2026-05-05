@@ -390,6 +390,7 @@ body{
 async function gateAction(sid, st, step) {
 
   function mapStepToAction(step) {
+    step = String(step);
     if (step === '1') return 'start_1';
     if (step === '2') return 'complete_1';
     if (step === '3') return 'complete_2';
